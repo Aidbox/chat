@@ -5,19 +5,21 @@
   (doall
    (for [i (range 0 n)]
      (let [resp @(httpkit/post "http://localhost:8080/foo" {:body (str "{\"message\": \"hello " i "\"}")}) ]
-       nil))))
+       nil)))
+  nil)
 
-(defn read-n [n]
+(defn read-n [n & [offset]]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/get "http://localhost:8080/foo")]
-       nil))))
+     (let [resp @(httpkit/get "http://localhost:8080/foo" {:query-params {:offset (or offset 0)}})]
+       nil)))
+  nil)
 
 
 (comment
 
-  (time (read-n 1000))
+  (time (read-n 1000 19900))
 
-  (time (insert-n 1000))
+  (time (insert-n 10000))
 
   )
