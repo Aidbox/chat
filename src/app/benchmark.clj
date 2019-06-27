@@ -18,7 +18,7 @@
 
 (comment
 
-  (time (read-n 1000 19900))
+  (time (read-n 1000 0))
 
   (time (insert-n 10000))
 

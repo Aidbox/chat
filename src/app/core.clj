@@ -6,9 +6,13 @@
 (defonce topics (atom {}))
 
 (defn setup-config [filename]
-  (let [file (io/file (str "./" filename))]
+  (let [file (io/file (str "./" filename))
+        writer (io/writer file :append true)
+        reader (io/input-stream file)]
+    (.mark reader 0)
     {:file file
-     :writer (clojure.java.io/writer file :append true)}))
+     :writer writer
+     :reader reader}))
 
 (defn get-file-config [filename]
   (let [file-config (@topics filename)]
@@ -23,10 +27,13 @@
          (into {}))
     {}))
 
-(defn read-file [reader params]
-  (let [offset (get params "offset" "0")
-        offset (. Integer parseInt offset)]
-    (str/join  "\n" (drop offset (line-seq reader)))))
+(defn read-stream [stream _params]
+  (.mark stream 0)
+  (let [xout (java.io.ByteArrayOutputStream.)
+        _ (io/copy stream xout)
+        result (slurp (.toByteArray xout))]
+    (.reset stream)
+    result))
 
 (defn app [req]
   (let [{uri :uri action :request-method} req
@@ -44,10 +51,10 @@
               (httpkit/send! channel {:status  200
                                       :headers {"Content-Type" "text/html"}
                                       :body    ""}))
-            (with-open [reader (io/reader file)]
-              (httpkit/send! channel {:status  200
-                                      :headers {"Content-Type" "text/html"}
-                                      :body    (read-file reader params)})))
+            (let [reader (:reader file-config)]
+                (httpkit/send! channel {:status  200
+                                        :headers {"Content-Type" "text/html"}
+                                        :body    (read-stream reader params)})))
           (httpkit/close channel))))))
 
 (defonce server (atom nil))
@@ -73,5 +80,9 @@
  (restart)
  (reset! topics {})
 
- )
+ (let [stream (io/input-stream "./foo")]
+   [(count (read-stream stream {}))
+   (count (read-stream stream {}))]
+   )
 
+ )
