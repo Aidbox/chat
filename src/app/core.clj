@@ -20,6 +20,11 @@
       file-config
       (get (swap! topics #(assoc % filename (setup-config filename))) filename))))
 
+(defn reload-reader [filename]
+  (swap! topics #(let [{file :file reader :reader} (get % filename)]
+                   (.close reader)
+                   (assoc-in % [filename :reader] (io/input-stream file)))))
+
 (defn parse-quesrystring [qs]
   (if qs
     (->> (str/split qs #"&")
@@ -48,6 +53,7 @@
               (io/copy (:body req) writer)
               (.write writer "\n")
               (.flush writer)
+              (reload-reader filename)
               (httpkit/send! channel {:status  200
                                       :headers {"Content-Type" "text/html"}
                                       :body    ""}))
