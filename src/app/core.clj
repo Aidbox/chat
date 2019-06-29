@@ -53,7 +53,6 @@
               (io/copy (:body req) writer)
               (.write writer "\n")
               (.flush writer)
-              (reload-reader filename)
               (httpkit/send! channel {:status  200
                                       :headers {"Content-Type" "text/html"}
                                       :body    ""}))
