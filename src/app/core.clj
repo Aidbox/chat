@@ -28,7 +28,7 @@
     {}))
 
 (defn read-stream [stream _params]
-  (.mark stream 0)
+  (.mark stream (+ 1 (.available stream)))
   (let [xout (java.io.ByteArrayOutputStream.)
         _ (io/copy stream xout)
         result (slurp (.toByteArray xout))]
