@@ -153,11 +153,11 @@
 
 (defn restart []
   (stop-server)
+  (reset! topics {})
   (start-server)
   )
 
 (comment
  (-main)
  (restart)
- (reset! topics {})
  )

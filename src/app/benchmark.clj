@@ -1,5 +1,7 @@
 (ns app.benchmark
-  (:require [org.httpkit.client :as httpkit]))
+  (:require [org.httpkit.client :as httpkit]
+            [clojure.java.io :as io]
+            [app.core :as app]))
 
 (defn insert-n [n]
   (doall
@@ -18,8 +20,32 @@
 
 (comment
 
-  (time (insert-n 10000))
-
-  (time (read-n 1000 9998))
+  (do
+    (io/delete-file "./data/foo.data")
+    (io/delete-file "./data/foo.index")
+    (app/restart)
+    (println "WRITE ==================")
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (time (insert-n 10000))
+    (println "READ ==================")
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999))
+    (time (read-n 1000 99999)))
 
   )
