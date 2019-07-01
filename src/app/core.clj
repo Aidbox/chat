@@ -1,7 +1,12 @@
 (ns app.core
   (:require [org.httpkit.server :as httpkit]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  (:import java.io.File
+           java.io.InputStream
+           java.io.Writer))
+
+(set! *warn-on-reflection* true)
 
 (def index-step 100)
 
@@ -21,7 +26,7 @@
            cur-char)
           start)))))
 
-(defn load-index-cache [file index-file]
+(defn load-index-cache [file ^java.io.File index-file]
   (try
     (if (.exists index-file)
       (with-open [reader (io/reader index-file)]
@@ -77,7 +82,7 @@
          (into {}))
     {}))
 
-(defn read-stream [stream line-index {offset "offset" :or {offset "0"}}]
+(defn read-stream [^java.io.InputStream stream line-index {offset "offset" :or {offset "0"}}]
   (.mark stream (+ 1 (.available stream)))
   (let [offset (Integer/parseInt offset)
         base-offset (* (int (/ offset index-step)) index-step)
@@ -104,15 +109,15 @@
 
 (defn app [req]
   (let [{uri :uri action :request-method} req
-        filename (.substring uri 1)
+        filename (subs uri 1)
         file-config (get-file-config filename)]
     (httpkit/with-channel req channel
       (let [file (:file file-config)
             params (parse-quesrystring (:query-string req))]
         (locking file
           (if (= action :post)
-            (let [writer (:writer file-config)
-                  index-writer (:index-writer file-config)
+            (let [^java.io.Writer writer (:writer file-config)
+                  ^java.io.Writer index-writer (:index-writer file-config)
                   index-file (:index-file file-config)
                   data (slurp (:body req))]
               (.write writer data)
