@@ -1,6 +1,7 @@
 (ns app.core
   (:require [org.httpkit.server :as httpkit]
             [clojure.java.io :as io]
+            [cheshire.core :as json]
             [clojure.string :as str])
   (:import java.io.File
            java.io.InputStream
@@ -43,6 +44,7 @@
           {:lines-count (+ last-index (count-extra-lines file last-offset))
            :length (with-open [reader (io/input-stream file)]
                      (.available reader))
+           :last-index last-index
            :line-index line-index}))
       nil)
     (catch Exception e nil)))
@@ -55,6 +57,7 @@
         index-cache (if index-cache
                       index-cache
                       {:lines-count 0
+                       :last-index 0
                        :length 0
                        :line-index {}})
         index-writer (io/writer index-file :append true)
@@ -82,17 +85,21 @@
          (into {}))
     {}))
 
-(defn read-stream [^java.io.InputStream stream line-index {offset "offset" :or {offset "0"}}]
+(defn read-stream [filename ^java.io.InputStream stream line-index {offset "offset" :or {offset "0"}}]
   (.mark stream (+ 1 (.available stream)))
-  (let [offset (Integer/parseInt offset)]
+  (let [offset (Integer/parseInt offset)
+        offset (if (= offset 0)
+                 (- (get-in @topics [filename :index-cache :last-index]) 50)
+                 offset)
+        offset (if ( < offset 0) 0 offset)]
     (when (> offset 0)
-      (let [
-            base-offset (* (int (/ offset index-step)) index-step)
+      (let [base-offset (* (int (/ offset index-step)) index-step)
             manual-offset (- offset base-offset)
             byte-offset (get line-index base-offset 0)]
+        (println manual-offset)
         (.skip stream byte-offset)
         (loop [start 0
-               prev-char -1]
+               prev-char (if (= base-offset 0) 125 -1)]
           (when (< start manual-offset)
             (let [cur-char (.read stream)]
               (when (not= cur-char -1)
@@ -128,21 +135,24 @@
               (let [^java.io.Writer writer (:writer file-config)
                     ^java.io.Writer index-writer (:index-writer file-config)
                     index-file (:index-file file-config)
-                    data (slurp (:body req))]
+                    data (json/parse-string (slurp (:body req)))
+                    data (json/generate-string (assoc data :message-index (+ 1 (get-in @topics [filename :index-cache :lines-count]))))
+                    new-data-length (count data)]
+                (update-cache-index filename (fn [{:keys [lines-count length line-index last-index]}]
+                                               (let [count (+ lines-count 1)
+                                                     need-index (= 0 (mod count index-step))]
+                                                 {:lines-count count
+                                                  :length (+ new-data-length length)
+                                                  :last-index (if need-index count last-index)
+                                                  :line-index (if need-index
+                                                                (do
+                                                                  (.write index-writer (str count " " length "\n"))
+                                                                  (.flush index-writer)
+                                                                  (assoc line-index count length)
+                                                                  )
+                                                                line-index)})))
                 (.write writer data)
                 (.flush writer)
-                (let [new-data-length (count data)]
-                  (update-cache-index filename (fn [{:keys [lines-count length line-index]}]
-                                                 (let [count (+ lines-count 1)]
-                                                   {:lines-count count
-                                                    :length (+ new-data-length length)
-                                                    :line-index (if (= 0 (mod count index-step))
-                                                                  (do
-                                                                    (.write index-writer (str count " " length "\n"))
-                                                                    (.flush index-writer)
-                                                                    (assoc line-index count length)
-                                                                    )
-                                                                  line-index)}))))
                 (httpkit/send! channel {:status  200
                                         :headers {"Content-Type" "text/html"
                                                   "Access-Control-Allow-Origin" "*"}
@@ -151,7 +161,7 @@
                 (httpkit/send! channel {:status  200
                                         :headers {"Content-Type" "text/html"
                                                   "Access-Control-Allow-Origin" "*"}
-                                        :body    (read-stream reader (get-in @topics [filename :index-cache :line-index]) params)})))
+                                        :body    (read-stream filename reader (get-in @topics [filename :index-cache :line-index]) params)})))
             (httpkit/close channel)))))))
 
 (defonce server (atom nil))

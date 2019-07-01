@@ -94,12 +94,16 @@
          if(!roomId) {
              return;
          }
-         fetch(`//${host}/${roomId}?offset=${lastId}`)
+         let offset = "";
+         if(lastId > 0){
+             offset = `?offset=${lastId + 1}`;
+         }
+         fetch(`//${host}/${roomId}${offset}` )
              .then(response => response.text())
              .then(parseJSON)
              .then(data  => {
                  if(data.length) {
-                     lastId += data.length;
+                     lastId = data[data.length - 1]["message-index"];
                      window.messages.innerHTML +=
                          data.map(item => `<p>${item.text}</p>`).join('');
                      window.messages.scrollTop = window.messages.lastChild.offsetTop

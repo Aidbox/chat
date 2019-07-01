@@ -6,7 +6,7 @@
 (defn insert-n [n]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/post "http://localhost:8080/foo" {:body (str "{\"message\": \"hello " i "\"}")}) ]
+     (let [resp @(httpkit/post "http://localhost:8080/foo" {:body (str "{\"text\": \"hello " i "\"}")}) ]
        nil)))
   nil)
 
