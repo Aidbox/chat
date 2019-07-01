@@ -105,7 +105,7 @@
           _ (io/copy stream out-stream)
           result (.toString out-stream)]
       (.reset stream)
-      (if (not= (get result 0) \{)
+      (if (and (> (count result) 0) (not= (get result 0) \{))
         (str "{" result)
         result))))
 
