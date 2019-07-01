@@ -1,0 +1,109 @@
+<html>
+    <head>
+        <style>
+         .flex-row {
+             display: flex;
+         }
+         .flex-column {
+             display: flex;
+             flex-direction: column;
+         }
+         #messages {
+             max-height: 600px;
+             overflow: scroll;
+         }
+        </style>
+    </head>
+    <body>
+        <div class="flex-column">
+            <div id="messages">
+            </div>
+            <input id="roomName"/>
+            <textarea id="message"></textarea>
+            <button id="send">Send</button>
+            </div>
+        </div>
+    </body>
+    <script>
+     function parseQuery(queryString) {
+         const query = {};
+         const pairs = (queryString[0] === '?' ? queryString.substr(1) : queryString).split('&');
+         for (let i = 0; i < pairs.length; i++) {
+             const pair = pairs[i].split('=');
+             query[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1] || '');
+         }
+         return query;
+     }
+
+     const search = parseQuery(window.location.search);
+     let roomId = search.room;
+     if (roomId){
+         window.roomName.value = roomId;
+     }
+
+     let lastId = 0;
+
+     window.roomName.onchange = (e) => {
+         roomId = e.target.value;
+     }
+
+     function addNewMessage(e) {
+         const text = window.message.value;
+         sendMessage({text, id: lastId + 1});
+         window.message.value = "";
+     }
+
+     window.message.onkeydown = (e) => {
+         if(e.ctrlKey && e.keyCode === 13) {
+             addNewMessage(e);
+         }
+     }
+
+     window.send.onclick = addNewMessage
+
+     function sendMessage(message) {
+         fetch(`http://localhost:8080/${roomId}`,{
+             method: 'POST',
+             body: JSON.stringify(message),
+         });
+     }
+
+     function parseJSON(text) {
+         if(text.length === 0) {
+             return [];
+         }
+         let start = 0;
+         let result = [];
+         let prevChar = "";
+         for(let current = 0; current < text.length; current ++){
+             const currentChar = text[current];
+             if(prevChar === "}" && currentChar === "{") {
+                 const json = text.substr(start, current - start);
+                 result.push(JSON.parse(json)); 
+                 start = current;
+             }
+             prevChar = currentChar;
+         }
+         const json = text.substr(start);
+         result.push(JSON.parse(json));
+         return result;
+     }
+
+     setInterval(() => {
+         if(!roomId) {
+             return;
+         }
+         fetch(`http://localhost:8080/${roomId}?offset=${lastId}`)
+             .then(response => response.text())
+             .then(parseJSON)
+             .then(data  => {
+                 if(data.length) {
+                     lastId += data.length;
+                     window.messages.innerHTML +=
+                         data.map(item => `<p>${item.text}</p>`).join('');
+                     window.messages.scrollTop = window.messages.lastChild.offsetTop
+                 }
+             });
+     }, 500);
+    </script>
+</html>
