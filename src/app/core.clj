@@ -84,26 +84,28 @@
 
 (defn read-stream [^java.io.InputStream stream line-index {offset "offset" :or {offset "0"}}]
   (.mark stream (+ 1 (.available stream)))
-  (let [offset (Integer/parseInt offset)
-        base-offset (* (int (/ offset index-step)) index-step)
-        manual-offset (- offset base-offset)
-        byte-offset (get line-index base-offset 0)]
-    (.skip stream byte-offset)
-    (loop [start -1
-           prev-char -1]
-      (let [cur-char (.read stream)]
-        (when (and (not= cur-char -1)
-                   (< start manual-offset))
-          (recur
-           (if (and (= prev-char 125) (= cur-char 123))
-             (+ 1 start)
-             start)
-           cur-char))))
+  (let [offset (Integer/parseInt offset)]
+    (when (> offset 0)
+      (let [
+            base-offset (* (int (/ offset index-step)) index-step)
+            manual-offset (- offset base-offset)
+            byte-offset (get line-index base-offset 0)]
+        (.skip stream byte-offset)
+        (loop [start 0
+               prev-char -1]
+          (when (< start manual-offset)
+            (let [cur-char (.read stream)]
+              (when (not= cur-char -1)
+                (recur
+                 (if (and (= prev-char 125) (= cur-char 123))
+                   (+ 1 start)
+                   start)
+                 cur-char)))))))
     (let [out-stream (java.io.StringWriter.)
           _ (io/copy stream out-stream)
           result (.toString out-stream)]
       (.reset stream)
-      (if (not= (get result 0) "{")
+      (if (not= (get result 0) \{)
         (str "{" result)
         result))))
 
@@ -135,11 +137,13 @@
                                                                   )
                                                                 line-index)}))))
               (httpkit/send! channel {:status  200
-                                      :headers {"Content-Type" "text/html"}
+                                      :headers {"Content-Type" "text/html"
+                                                "Access-Control-Allow-Origin" "*"}
                                       :body    ""}))
             (let [reader (:reader file-config)]
                 (httpkit/send! channel {:status  200
-                                        :headers {"Content-Type" "text/html"}
+                                        :headers {"Content-Type" "text/html"
+                                                  "Access-Control-Allow-Origin" "*"}
                                         :body    (read-stream reader (get-in @topics [filename :index-cache :line-index]) params)})))
           (httpkit/close channel))))))
 
