@@ -109,43 +109,50 @@
         (str "{" result)
         result))))
 
+(defn index []
+  {:status 200
+   :body (slurp "./resources/html/index.html")}
+  )
+
 (defn app [req]
   (let [{uri :uri action :request-method} req
         filename (subs uri 1)
         file-config (get-file-config filename)]
-    (httpkit/with-channel req channel
-      (let [file (:file file-config)
-            params (parse-quesrystring (:query-string req))]
-        (locking file
-          (if (= action :post)
-            (let [^java.io.Writer writer (:writer file-config)
-                  ^java.io.Writer index-writer (:index-writer file-config)
-                  index-file (:index-file file-config)
-                  data (slurp (:body req))]
-              (.write writer data)
-              (.flush writer)
-              (let [new-data-length (count data)]
-                (update-cache-index filename (fn [{:keys [lines-count length line-index]}]
-                                               (let [count (+ lines-count 1)]
-                                                 {:lines-count count
-                                                  :length (+ new-data-length length)
-                                                  :line-index (if (= 0 (mod count index-step))
-                                                                (do
-                                                                  (.write index-writer (str count " " length "\n"))
-                                                                  (.flush index-writer)
-                                                                  (assoc line-index count length)
-                                                                  )
-                                                                line-index)}))))
-              (httpkit/send! channel {:status  200
-                                      :headers {"Content-Type" "text/html"
-                                                "Access-Control-Allow-Origin" "*"}
-                                      :body    ""}))
-            (let [reader (:reader file-config)]
+    (case uri
+      "/" (index)
+      (httpkit/with-channel req channel
+        (let [file (:file file-config)
+              params (parse-quesrystring (:query-string req))]
+          (locking file
+            (if (= action :post)
+              (let [^java.io.Writer writer (:writer file-config)
+                    ^java.io.Writer index-writer (:index-writer file-config)
+                    index-file (:index-file file-config)
+                    data (slurp (:body req))]
+                (.write writer data)
+                (.flush writer)
+                (let [new-data-length (count data)]
+                  (update-cache-index filename (fn [{:keys [lines-count length line-index]}]
+                                                 (let [count (+ lines-count 1)]
+                                                   {:lines-count count
+                                                    :length (+ new-data-length length)
+                                                    :line-index (if (= 0 (mod count index-step))
+                                                                  (do
+                                                                    (.write index-writer (str count " " length "\n"))
+                                                                    (.flush index-writer)
+                                                                    (assoc line-index count length)
+                                                                    )
+                                                                  line-index)}))))
+                (httpkit/send! channel {:status  200
+                                        :headers {"Content-Type" "text/html"
+                                                  "Access-Control-Allow-Origin" "*"}
+                                        :body    ""}))
+              (let [reader (:reader file-config)]
                 (httpkit/send! channel {:status  200
                                         :headers {"Content-Type" "text/html"
                                                   "Access-Control-Allow-Origin" "*"}
                                         :body    (read-stream reader (get-in @topics [filename :index-cache :line-index]) params)})))
-          (httpkit/close channel))))))
+            (httpkit/close channel)))))))
 
 (defonce server (atom nil))
 

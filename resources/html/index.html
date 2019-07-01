@@ -36,6 +36,7 @@
      }
 
      const search = parseQuery(window.location.search);
+     const host = window.location.host;
      let roomId = search.room;
      if (roomId){
          window.roomName.value = roomId;
@@ -62,7 +63,7 @@
      window.send.onclick = addNewMessage
 
      function sendMessage(message) {
-         fetch(`http://localhost:8080/${roomId}`,{
+         fetch(`//${host}/${roomId}`,{
              method: 'POST',
              body: JSON.stringify(message),
          });
@@ -93,7 +94,7 @@
          if(!roomId) {
              return;
          }
-         fetch(`http://localhost:8080/${roomId}?offset=${lastId}`)
+         fetch(`//${host}/${roomId}?offset=${lastId}`)
              .then(response => response.text())
              .then(parseJSON)
              .then(data  => {
