@@ -7,26 +7,57 @@
 
 (defonce topics (atom {}))
 
+(defn count-extra-lines [file offset]
+  (with-open [stream (io/reader file)]
+    (.skip stream offset)
+    (loop [start 0
+           prev-char -1]
+      (let [cur-char (.read stream)]
+        (if (not= cur-char -1)
+          (recur
+           (if (and (= prev-char 125) (= cur-char 123))
+             (+ 1 start)
+             start)
+           cur-char)
+          start)))))
+
+(defn load-index-cache [file index-file]
+  (try
+    (if (.exists index-file)
+      (with-open [reader (io/reader index-file)]
+        (let [lines (-> reader
+                        slurp
+                        (str/split #"\n"))
+              pairs (->> lines
+                         (map #(str/split % #" "))
+                         (map (fn [[k v]]
+                                [(Integer/parseInt k)
+                                 (Integer/parseInt v)])))
+              [last-index last-offset] (last pairs)
+              line-index (into {} pairs)]
+          {:lines-count (+ last-index (count-extra-lines file last-offset))
+           :length (with-open [reader (io/input-stream file)]
+                     (.available reader))
+           :line-index line-index}))
+      nil)
+    (catch Exception e nil)))
+
 (defn setup-config [filename]
   (let [base-filename (str "./data/" filename)
         file (io/file (str base-filename ".data"))
         index-file (io/file (str base-filename ".index"))
-        index-cache (try
-                      (if (.exists index-file)
-                        (with-open [reader (io/reader index-file)]
-                          (read-string (slurp reader)))
-                        nil)
-                      (catch Exception e nil))
+        index-cache (load-index-cache file index-file)
         index-cache (if index-cache
                       index-cache
                       {:lines-count 0
                        :length 0
                        :line-index {}})
+        index-writer (io/writer index-file :append true)
         writer (io/writer file :append true)
         reader (io/input-stream file)]
     {:file file
      :index-cache index-cache
-     :index-file index-file
+     :index-writer index-writer
      :writer writer
      :reader reader}))
 
@@ -81,6 +112,7 @@
         (locking file
           (if (= action :post)
             (let [writer (:writer file-config)
+                  index-writer (:index-writer file-config)
                   index-file (:index-file file-config)
                   data (slurp (:body req))]
               (.write writer data)
@@ -91,10 +123,12 @@
                                                  {:lines-count count
                                                   :length (+ new-data-length length)
                                                   :line-index (if (= 0 (mod count index-step))
-                                                                (assoc line-index count length)
-                                                                line-index)})))
-                (with-open [index-writer (io/writer index-file)]
-                  (.write index-writer (pr-str (get-in @topics [filename :index-cache])))))
+                                                                (do
+                                                                  (.write index-writer (str count " " length "\n"))
+                                                                  (.flush index-writer)
+                                                                  (assoc line-index count length)
+                                                                  )
+                                                                line-index)}))))
               (httpkit/send! channel {:status  200
                                       :headers {"Content-Type" "text/html"}
                                       :body    ""}))
