@@ -3,4 +3,4 @@
 example/config/jwtRS256.*
 .env
 .nrepl-port
-foo
+data/
