@@ -25,6 +25,9 @@
         </div>
     </body>
     <script>
+     function messageTemplate(item) {
+         return `<p><b>${item.timestmap} (${item["message-index"]})</b><br/>${item.text}</p>`;
+     }
      function parseQuery(queryString) {
          const query = {};
          const pairs = (queryString[0] === '?' ? queryString.substr(1) : queryString).split('&');
@@ -37,12 +40,14 @@
 
      const search = parseQuery(window.location.search);
      const host = window.location.host;
+     let lastId = 0;
+     let chat = [];
+
      let roomId = search.room;
      if (roomId){
          window.roomName.value = roomId;
      }
 
-     let lastId = 0;
 
      window.roomName.onchange = (e) => {
          roomId = e.target.value;
@@ -69,6 +74,28 @@
          });
      }
 
+     window.messages.onscroll = (e) => {
+         if(e.target.scrollTop === 0){
+             loadHistory();
+         }
+     }
+
+     function loadHistory() {
+         if(chat.length) {
+             const history = chat[0]["message-index"];
+             fetch(`//${host}/${roomId}?history=${history}`)
+                 .then(response => response.text())
+                 .then(parseJSON)
+                 .then(data  => {
+                     if(data.length) {
+                         chat = data.concat(chat);
+                         window.messages.innerHTML =
+                             data.map(messageTemplate).join('') + window.messages.innerHTML;
+                     }
+                 });
+         }
+     }
+
      function parseJSON(text) {
          if(text.length === 0) {
              return [];
@@ -80,7 +107,7 @@
              const currentChar = text[current];
              if(prevChar === "}" && currentChar === "{") {
                  const json = text.substr(start, current - start);
-                 result.push(JSON.parse(json)); 
+                 result.push(JSON.parse(json));
                  start = current;
              }
              prevChar = currentChar;
@@ -103,10 +130,11 @@
              .then(parseJSON)
              .then(data  => {
                  if(data.length) {
+                     chat = chat.concat(data);
                      lastId = data[data.length - 1]["message-index"];
                      window.messages.innerHTML +=
-                         data.map(item => `<p>${item.text}</p>`).join('');
-                     window.messages.scrollTop = window.messages.lastChild.offsetTop
+                         data.map(messageTemplate) .join('');
+                     window.messages.scrollTop = window.messages.lastChild.offsetTop;
                  }
              });
      }, 500);

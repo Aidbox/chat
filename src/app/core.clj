@@ -2,6 +2,7 @@
   (:require [org.httpkit.server :as httpkit]
             [clojure.java.io :as io]
             [cheshire.core :as json]
+            [clj-time.core :as time]
             [clojure.string :as str])
   (:import java.io.File
            java.io.InputStream
@@ -34,19 +35,26 @@
         (let [lines (-> reader
                         slurp
                         (str/split #"\n"))
-              pairs (->> lines
-                         (map #(str/split % #" "))
-                         (map (fn [[k v]]
-                                [(Integer/parseInt k)
-                                 (Integer/parseInt v)])))
+              pairs (if (= lines [])
+                      (->> lines
+                           (map #(str/split % #" "))
+                           (map (fn [[k v]]
+                                  (println k v)
+                                  [(Integer/parseInt k)
+                                   (Integer/parseInt v)])))
+                      [[1 0]])
               [last-index last-offset] (last pairs)
               line-index (into {} pairs)]
           {:lines-count (+ last-index (count-extra-lines file last-offset))
            :length (with-open [reader (io/input-stream file)]
                      (.available reader))
            :last-index last-index
-           :line-index line-index}))
-      nil)
+           :line-index (if (= line-index {1 0}) {} line-index)}))
+      {:lines-count (count-extra-lines file 0)
+       :length (with-open [reader (io/input-stream file)]
+                 (.available reader))
+       :last-index 0
+       :line-index {}})
     (catch Exception e nil)))
 
 (defn setup-config [filename]
@@ -82,14 +90,30 @@
   (if qs
     (->> (str/split qs #"&")
          (map #(str/split % #"="))
+         (map (fn [[k v]] [(keyword k) v]))
          (into {}))
     {}))
 
-(defn read-stream [filename ^java.io.InputStream stream line-index {offset "offset" :or {offset "0"}}]
+
+(defn read-history [filename ^java.io.InputStream stream line-index & [history-index]]
   (.mark stream (+ 1 (.available stream)))
-  (let [offset (Integer/parseInt offset)
-        offset (if (= offset 0)
-                 (- (get-in @topics [filename :index-cache :last-index]) 50)
+  (let [prev-index (- history-index index-step)
+        start-offset (get line-index prev-index)
+        stop-offset (get line-index history-index)
+        length (- stop-offset start-offset)
+        bytes (byte-array length)
+        out-stream (java.io.StringWriter.)]
+    (.skip stream start-offset)
+    (.read stream bytes)
+    (io/copy bytes out-stream)
+    (.reset stream)
+    (.toString out-stream)))
+
+(defn read-stream [filename ^java.io.InputStream stream line-index & [offset]]
+  (.mark stream (+ 1 (.available stream)))
+  (let [{:keys [line-index]} (get-in @topics [filename :index-cache])
+        offset (if (nil? offset)
+                 (second (reverse (sort (keys line-index))))
                  offset)
         offset (if ( < offset 0) 0 offset)]
     (when (> offset 0)
@@ -135,7 +159,10 @@
                     ^java.io.Writer index-writer (:index-writer file-config)
                     index-file (:index-file file-config)
                     data (json/parse-string (slurp (:body req)))
-                    data (json/generate-string (assoc data :message-index (+ 1 (get-in @topics [filename :index-cache :lines-count]))))
+                    data (json/generate-string
+                          (assoc data
+                                 :message-index (+ 1 (get-in @topics [filename :index-cache :lines-count]))
+                                 :timestmap (str (time/now))))
                     new-data-length (count data)]
                 (update-cache-index filename (fn [{:keys [lines-count length line-index last-index]}]
                                                (let [count (+ lines-count 1)
@@ -156,11 +183,20 @@
                                         :headers {"Content-Type" "text/html"
                                                   "Access-Control-Allow-Origin" "*"}
                                         :body    ""}))
-              (let [reader (:reader file-config)]
-                (httpkit/send! channel {:status  200
-                                        :headers {"Content-Type" "text/html"
-                                                  "Access-Control-Allow-Origin" "*"}
-                                        :body    (read-stream filename reader (get-in @topics [filename :index-cache :line-index]) params)})))
+              (let [reader (:reader file-config)
+                    {:keys [offset history]} params
+                    offset (when offset (Integer/parseInt offset))
+                    history (when history (Integer/parseInt history))]
+                (if (not (or (nil? offset) (nil? history)))
+                  (httpkit/send! channel {:status  422
+                                          :headers {"Content-Type" "text/html"}})
+                  (let [body (if history
+                               (read-history filename reader (get-in @topics [filename :index-cache :line-index]) history)
+                               (read-stream filename reader (get-in @topics [filename :index-cache :line-index]) offset))]
+                    (httpkit/send! channel {:status  200
+                                           :headers {"Content-Type" "text/html"
+                                                     "Access-Control-Allow-Origin" "*"}
+                                           :body body})))))
             (httpkit/close channel)))))))
 
 (defonce server (atom nil))
@@ -185,4 +221,13 @@
 (comment
  (-main)
  (restart)
+ (load-index-cache (io/file "./data/count.data") (io/file "./data/count.index"))
+
+ (let [reader (io/input-stream (io/file "./data/count.data"))
+       data (byte-array 10)]
+   (.read reader data)
+   data
+   )
+
+
  )
