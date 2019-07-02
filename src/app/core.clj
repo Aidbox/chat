@@ -96,7 +96,6 @@
       (let [base-offset (* (int (/ offset index-step)) index-step)
             manual-offset (- offset base-offset)
             byte-offset (get line-index base-offset 0)]
-        (println manual-offset)
         (.skip stream byte-offset)
         (loop [start 0
                prev-char (if (= base-offset 0) 125 -1)]
