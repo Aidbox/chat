@@ -1,4 +1,5 @@
-{:paths ["src" "../src" "resources"]
+{:paths ["src"]
+ :extra-paths ["resources"]
  :deps {environ  {:mvn/version "1.1.0"}
         clj-http {:mvn/version "3.6.1"}
         http-kit {:mvn/version "2.2.0"}
@@ -6,29 +7,20 @@
         clj-time {:mvn/version "0.5.1"}
         }
 
- :mvn/repos {"central" {:url "https://repo1.maven.org/maven2/"}
-             "clojars" {:url "https://repo.clojars.org/"}}
+ :aliases
+ {:nrepl
+  {:extra-paths ["dev"]
+   :extra-deps {spyscope                      {:mvn/version "0.1.6"}
+                org.clojure/clojure           {:mvn/version "1.10.0"}
+                org.clojure/tools.nrepl       {:mvn/version "0.2.13"}
+                cider/cider-nrepl             {:mvn/version "0.20.0"}
+                refactor-nrepl/refactor-nrepl {:mvn/version "2.4.0"}}
+   :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
+  :uberjar
+  {:extra-paths ["resources"]
+   :extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
+                                 :sha     "81b9e47d992b17aa3e3af1a47aed1f0287ebe9b8"}}
+   :main-opts ["-m" "mach.pack.alpha.capsule" "app.jar"
+               "-m" "app.core"]}
 
- :aliases {:uberjar {:extra-deps {xfthhxk/cambada {:git/url "https://github.com/xfthhxk/cambada.git"
-                                                   :sha "8fdc7d29a41620ad3e9e6210fd7140f3a4c7936b"}}
-                     :main-opts ["-m" "cambada.uberjar"
-                                 "-a" "all"
-                                 "--app-artifact-id" "app" "--app-version" "0.1.0"
-                                 "-m" "app.core" "--no-copy-source"]}
-           :nrepl
-           {:extra-deps
-            {spyscope {:mvn/version "0.1.6"}
-             org.clojure/tools.nrepl {:mvn/version "0.2.13"}
-             cider/cider-nrepl {:mvn/version "0.20.0"}
-             refactor-nrepl/refactor-nrepl {:mvn/version "2.4.0"}}
-            :extra-paths ["dev"]}
-
-           :test {:extra-deps
-                  {com.cognitect/test-runner
-                   {:git/url "https://github.com/cognitect-labs/test-runner"
-                    :sha "3cb0a9daf1cb746259dc8309b218f9211ad3b33b"}}
-                  :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]
-                  :extra-paths ["test"]}
-
-           :runner
-           {:main-opts ["-m" "cognitect.test-runner"]}}}
+  :test {:extra-paths ["test"]}}}
