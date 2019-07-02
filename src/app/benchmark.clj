@@ -13,9 +13,17 @@
 (defn read-n [n & [offset]]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/get "http://localhost:8080/foo" {:query-params {:offset (or offset 0)}})]
+     (let [resp @(httpkit/get "http://localhost:8080/foo" (when offset {:query-params {:offset offset}}))]
        nil)))
   nil)
+
+(defn history-n [n history]
+  (doall
+   (for [i (range 0 n)]
+     (let [resp @(httpkit/get "http://localhost:8080/foo" {:query-params {:history history}})]
+       nil)))
+  nil)
+
 
 
 (comment
@@ -35,7 +43,18 @@
     (time (insert-n 10000))
     (time (insert-n 10000))
     (time (insert-n 10000))
-    (println "READ ==================")
+    (println "READ initial ==================")
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (time (read-n 10000))
+    (println "READ OFFSET ==================")
     (time (read-n 10000 99999))
     (time (read-n 10000 99999))
     (time (read-n 10000 99999))
@@ -46,6 +65,17 @@
     (time (read-n 10000 99999))
     (time (read-n 10000 99999))
     (time (read-n 10000 99999))
-    (time (read-n 10000 99999)))
+    (println "READ HISTORY ==================")
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    (time (history-n 10000 99800))
+    )
 
   )
