@@ -113,9 +113,9 @@
   (.mark stream (+ 1 (.available stream)))
   (let [{:keys [line-index]} (get-in @topics [filename :index-cache])
         offset (if (nil? offset)
-                 (second (reverse (sort (keys line-index))))
+                 (or (second (reverse (sort (keys line-index)))) 0)
                  offset)
-        offset (if ( < offset 0) 0 offset)]
+        offset (if (< offset 0) 0 offset)]
     (when (> offset 0)
       (let [base-offset (* (int (/ offset index-step)) index-step)
             manual-offset (- offset base-offset)
