@@ -135,6 +135,9 @@
                      window.messages.innerHTML +=
                          data.map(messageTemplate) .join('');
                      window.messages.scrollTop = window.messages.lastChild.offsetTop;
+                     if(offset === "" && data.length < 100) {
+                         loadHistory();
+                     }
                  }
              });
      }, 500);

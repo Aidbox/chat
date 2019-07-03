@@ -39,7 +39,6 @@
                       (->> lines
                            (map #(str/split % #" "))
                            (map (fn [[k v]]
-                                  (println k v)
                                   [(Integer/parseInt k)
                                    (Integer/parseInt v)])))
                       [[1 0]])
@@ -94,50 +93,52 @@
          (into {}))
     {}))
 
+(defn skip-extra [^java.io.InputStream stream manual-offset]
+  (loop [start 0
+         prev-char -1]
+    (when (< start manual-offset)
+      (let [cur-char (.read stream)]
+        (when (not= cur-char -1)
+          (recur
+           (if (and (= prev-char 125) (= cur-char 123))
+             (+ 1 start)
+             start)
+           cur-char))))))
 
-(defn read-history [filename ^java.io.InputStream stream line-index & [history-index]]
+(defn read-chunk [^java.io.InputStream stream line-index start-offset stop-offset & [extra-skip]]
   (.mark stream (+ 1 (.available stream)))
-  (let [prev-index (- history-index index-step)
-        start-offset (get line-index prev-index)
-        stop-offset (get line-index history-index)
-        length (- stop-offset start-offset)
-        bytes (byte-array length)
-        out-stream (java.io.StringWriter.)]
-    (.skip stream start-offset)
+  (let [extra-skip (when (not= extra-skip 0) extra-skip)
+        start-binary-offset (get line-index start-offset)
+        stop-binary-offset (get line-index stop-offset (.available stream))
+        length (- stop-binary-offset start-binary-offset)
+        out-stream (java.io.StringWriter.)
+        _ (.skip stream start-binary-offset)
+        _ (when extra-skip
+            (do
+              (skip-extra stream extra-skip)
+              (when (> (.available stream) 0)
+                (.write out-stream 123))))
+        bytes (byte-array (min length (.available stream)))]
     (.read stream bytes)
     (io/copy bytes out-stream)
     (.reset stream)
     (.toString out-stream)))
 
-(defn read-stream [filename ^java.io.InputStream stream line-index & [offset]]
-  (.mark stream (+ 1 (.available stream)))
-  (let [{:keys [line-index]} (get-in @topics [filename :index-cache])
-        offset (if (nil? offset)
-                 (or (second (reverse (sort (keys line-index)))) 0)
-                 offset)
-        offset (if (< offset 0) 0 offset)]
-    (when (> offset 0)
-      (let [base-offset (* (int (/ offset index-step)) index-step)
-            manual-offset (- offset base-offset)
-            byte-offset (get line-index base-offset 0)]
-        (.skip stream byte-offset)
-        (loop [start 0
-               prev-char (if (= base-offset 0) 125 -1)]
-          (when (< start manual-offset)
-            (let [cur-char (.read stream)]
-              (when (not= cur-char -1)
-                (recur
-                 (if (and (= prev-char 125) (= cur-char 123))
-                   (+ 1 start)
-                   start)
-                 cur-char)))))))
-    (let [out-stream (java.io.StringWriter.)
-          _ (io/copy stream out-stream)
-          result (.toString out-stream)]
-      (.reset stream)
-      (if (and (> (count result) 0) (not= (get result 0) \{))
-        (str "{" result)
-        result))))
+(defn read-history [^java.io.InputStream stream line-index history-index]
+  (read-chunk stream line-index (- history-index index-step) history-index))
+
+(defn read-stream [{:keys [^java.io.InputStream reader index-cache]} offset history]
+  (let [line-index (:line-index index-cache)]
+    (if history
+      (read-history reader line-index history)
+      (let [initial (nil? offset)
+            offset (if (nil? offset)
+                     (:lines-count index-cache)
+                     offset)
+            start-offset (* (int (/ offset index-step)) index-step)
+            stop-offset (+ start-offset index-step)
+            extra (- offset start-offset)]
+        (read-chunk reader line-index start-offset stop-offset (when-not initial extra))))))
 
 (defn index []
   {:status 200
@@ -190,13 +191,10 @@
                 (if (not (or (nil? offset) (nil? history)))
                   (httpkit/send! channel {:status  422
                                           :headers {"Content-Type" "text/html"}})
-                  (let [body (if history
-                               (read-history filename reader (get-in @topics [filename :index-cache :line-index]) history)
-                               (read-stream filename reader (get-in @topics [filename :index-cache :line-index]) offset))]
-                    (httpkit/send! channel {:status  200
-                                           :headers {"Content-Type" "text/html"
-                                                     "Access-Control-Allow-Origin" "*"}
-                                           :body body})))))
+                  (httpkit/send! channel {:status  200
+                                          :headers {"Content-Type" "text/html"
+                                                    "Access-Control-Allow-Origin" "*"}
+                                          :body (read-stream file-config offset history)}))))
             (httpkit/close channel)))))))
 
 (defonce server (atom nil))
