@@ -17,41 +17,40 @@
 (defn count-extra-lines [file offset]
   (with-open [stream (io/reader file)]
     (.skip stream offset)
-    (loop [start 0
-           prev-char -1]
+    (loop [start 0]
       (let [cur-char (.read stream)]
         (if (not= cur-char -1)
           (recur
-           (if (and (= prev-char 125) (= cur-char 123))
+           (if (= cur-char 10)
              (+ 1 start)
-             start)
-           cur-char)
+             start))
           start)))))
 
 (defn load-index-cache [file ^java.io.File index-file]
   (try
     (if (.exists index-file)
       (let [lines (str/split (slurp index-file) #"\n")
-            pairs (if (not= lines [])
+            pairs (if (= lines [""])
+                    [[0 0]]
                     (->> lines
-                         (map #(str/split % #" "))
-                         (map (fn [[k v]]
-                                [(Integer/parseInt k)
-                                 (Integer/parseInt v)])))
-                    [[1 0]])
+                        (map #(str/split % #" "))
+                        (map (fn [[k v]]
+                               [(Integer/parseInt k)
+                                (Integer/parseInt v)]))
+                        (into [[0 0]])))
             [last-index last-offset] (last pairs)
             line-index (into {} pairs)]
         {:lines-count (+ last-index (count-extra-lines file last-offset))
          :length (with-open [reader (io/input-stream file)]
                    (.available reader))
          :last-index last-index
-         :line-index (if (= line-index {1 0}) {} line-index)})
+         :line-index line-index})
       {:lines-count (count-extra-lines file 0)
        :length (with-open [reader (io/input-stream file)]
                  (.available reader))
        :last-index 0
        :line-index {}})
-    (catch Exception e nil)))
+  (catch Exception e nil)))
 
 (defn setup-config [filename]
   (let [base-filename (str "./data/" filename)
@@ -63,7 +62,7 @@
                       {:lines-count 0
                        :last-index 0
                        :length 0
-                       :line-index {}})
+                       :line-index {0 0}})
         index-writer (io/writer index-file :append true)
         writer (io/writer file :append true)
         reader (io/input-stream file)]
@@ -90,36 +89,19 @@
          (into {}))
     {}))
 
-(defn skip-extra [^java.io.InputStream stream manual-offset]
-  (loop [start 0
-         prev-char -1]
-    (when (< start manual-offset)
-      (let [cur-char (.read stream)]
-        (when (not= cur-char -1)
-          (recur
-           (if (and (= prev-char 125) (= cur-char 123))
-             (+ 1 start)
-             start)
-           cur-char))))))
-
 (defn read-chunk [^java.io.InputStream stream line-index start-offset stop-offset & [extra-skip]]
   (.mark stream (+ 1 (.available stream)))
-  (let [extra-skip (when (not= extra-skip 0) extra-skip)
-        start-binary-offset (get line-index start-offset)
+  (let [start-binary-offset (get line-index start-offset)
         stop-binary-offset (get line-index stop-offset (.available stream))
+        _ (.skip stream start-binary-offset)
         length (- stop-binary-offset start-binary-offset)
         out-stream (java.io.StringWriter.)
-        _ (.skip stream start-binary-offset)
-        _ (when extra-skip
-            (do
-              (skip-extra stream extra-skip)
-              (when (> (.available stream) 0)
-                (.write out-stream 123))))
         bytes (byte-array (min length (.available stream)))]
     (.read stream bytes)
     (io/copy bytes out-stream)
     (.reset stream)
-    (.toString out-stream)))
+    (str/join "\n" (drop (or extra-skip 0) (str/split (.toString out-stream) #"\n")))))
+
 
 (defn read-history [^java.io.InputStream stream line-index history-index]
   (read-chunk stream line-index (- history-index index-step) history-index))
@@ -160,8 +142,8 @@
                     data (json/generate-string
                           (assoc data
                                  :message-index (+ 1 (get-in @topics [filename :index-cache :lines-count]))
-                                 :timestmap (str (time/now))))
-                    new-data-length (count data)]
+                                 :timestamp (str (time/now))))
+                    new-data-length (+ (count data) 1)]
                 (update-cache-index filename (fn [{:keys [lines-count length line-index last-index]}]
                                                (let [count (+ lines-count 1)
                                                      need-index (= 0 (mod count index-step))]
@@ -176,6 +158,7 @@
                                                                   )
                                                                 line-index)})))
                 (.write writer data)
+                (.write writer "\n")
                 (.flush writer)
                 (httpkit/send! channel {:status  200
                                         :headers {"Content-Type" "text/html"
@@ -226,7 +209,7 @@
 
  (first )
  
- @topics
+ (get-in @topics ["foo" :index-cache :line-index])
 
 
  )

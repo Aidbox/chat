@@ -29,9 +29,10 @@
 (comment
 
   (do
-    (io/delete-file "./data/foo.data")
-    (io/delete-file "./data/foo.index")
-    (app/restart)
+    (do
+      (io/delete-file "./data/foo.data")
+      (io/delete-file "./data/foo.index")
+      (app/restart))
     (do (println "WRITE ==================")
         (time (insert-n 10000))
         (time (insert-n 10000))

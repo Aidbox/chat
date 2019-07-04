@@ -100,21 +100,7 @@
          if(text.length === 0) {
              return [];
          }
-         let start = 0;
-         let result = [];
-         let prevChar = "";
-         for(let current = 0; current < text.length; current ++){
-             const currentChar = text[current];
-             if(prevChar === "}" && currentChar === "{") {
-                 const json = text.substr(start, current - start);
-                 result.push(JSON.parse(json));
-                 start = current;
-             }
-             prevChar = currentChar;
-         }
-         const json = text.substr(start);
-         result.push(JSON.parse(json));
-         return result;
+         return text.split("\n").filter(t => t.length).map(JSON.parse);
      }
 
      setInterval(() => {
