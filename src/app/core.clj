@@ -93,10 +93,10 @@
   (.mark stream (+ 1 (.available stream)))
   (let [start-binary-offset (get line-index start-offset)
         stop-binary-offset (get line-index stop-offset (.available stream))
-        _ (.skip stream start-binary-offset)
         length (- stop-binary-offset start-binary-offset)
         out-stream (java.io.StringWriter.)
         bytes (byte-array (min length (.available stream)))]
+    (.skip stream start-binary-offset)
     (.read stream bytes)
     (io/copy bytes out-stream)
     (.reset stream)
@@ -113,10 +113,11 @@
       (let [initial (nil? offset)
             offset (if (nil? offset)
                      (:lines-count index-cache)
-                     offset)
+                     (if (< offset index-step) offset (+ offset 1)))
             start-offset (* (int (/ offset index-step)) index-step)
             stop-offset (+ start-offset index-step)
-            extra (- offset start-offset)]
+            extra (- offset start-offset)
+            stop-offset (if (= extra 99) (+ stop-offset index-step) stop-offset)]
         (read-chunk reader line-index start-offset stop-offset (when-not initial extra))))))
 
 (defn index []
@@ -199,6 +200,7 @@
 (comment
  (-main)
  (restart)
+
  (load-index-cache (io/file "./data/foo.data") (io/file "./data/foo.index"))
 
  (let [reader (io/input-stream (io/file "./data/count.data"))

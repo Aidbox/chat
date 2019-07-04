@@ -26,7 +26,7 @@
     </body>
     <script>
      function messageTemplate(item) {
-         return `<p><b>${item.timestmap} (${item["message-index"]})</b><br/>${item.text}</p>`;
+         return `<p><b>${item.timestamp} (${item["message-index"]})</b><br/>${item.text}</p>`;
      }
      function parseQuery(queryString) {
          const query = {};
@@ -109,7 +109,7 @@
          }
          let offset = "";
          if(lastId > 0){
-             offset = `?offset=${lastId + 1}`;
+             offset = `?offset=${lastId}`;
          }
          fetch(`//${host}/${roomId}${offset}` )
              .then(response => response.text())
