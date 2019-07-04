@@ -31,24 +31,21 @@
 (defn load-index-cache [file ^java.io.File index-file]
   (try
     (if (.exists index-file)
-      (with-open [reader (io/reader index-file)]
-        (let [lines (-> reader
-                        slurp
-                        (str/split #"\n"))
-              pairs (if (= lines [])
-                      (->> lines
-                           (map #(str/split % #" "))
-                           (map (fn [[k v]]
-                                  [(Integer/parseInt k)
-                                   (Integer/parseInt v)])))
-                      [[1 0]])
-              [last-index last-offset] (last pairs)
-              line-index (into {} pairs)]
-          {:lines-count (+ last-index (count-extra-lines file last-offset))
-           :length (with-open [reader (io/input-stream file)]
-                     (.available reader))
-           :last-index last-index
-           :line-index (if (= line-index {1 0}) {} line-index)}))
+      (let [lines (str/split (slurp index-file) #"\n")
+            pairs (if (not= lines [])
+                    (->> lines
+                         (map #(str/split % #" "))
+                         (map (fn [[k v]]
+                                [(Integer/parseInt k)
+                                 (Integer/parseInt v)])))
+                    [[1 0]])
+            [last-index last-offset] (last pairs)
+            line-index (into {} pairs)]
+        {:lines-count (+ last-index (count-extra-lines file last-offset))
+         :length (with-open [reader (io/input-stream file)]
+                   (.available reader))
+         :last-index last-index
+         :line-index (if (= line-index {1 0}) {} line-index)})
       {:lines-count (count-extra-lines file 0)
        :length (with-open [reader (io/input-stream file)]
                  (.available reader))
@@ -219,13 +216,17 @@
 (comment
  (-main)
  (restart)
- (load-index-cache (io/file "./data/count.data") (io/file "./data/count.index"))
+ (load-index-cache (io/file "./data/foo.data") (io/file "./data/foo.index"))
 
  (let [reader (io/input-stream (io/file "./data/count.data"))
        data (byte-array 10)]
    (.read reader data)
    data
    )
+
+ (first )
+ 
+ @topics
 
 
  )
