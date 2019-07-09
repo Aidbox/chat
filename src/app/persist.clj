@@ -1,6 +1,7 @@
 (ns app.persist
   (:require [clojure.java.io :as io]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [cheshire.core :as json])
   (:import java.io.File
            java.io.InputStream
            java.io.Writer))
@@ -81,16 +82,32 @@
 (defn read-history [^java.io.InputStream stream line-index history-index]
   (read-chunk stream line-index (- history-index index-step) history-index))
 
-(defn read-stream [{:keys [^java.io.InputStream reader index-cache]} offset history]
-  (let [line-index (:line-index index-cache)]
-    (if history
-      (read-history reader line-index history)
-      (let [initial (nil? offset)
-            offset (if (nil? offset)
-                     (:lines-count index-cache)
-                     (if (< offset index-step) offset (+ offset 1)))
-            start-offset (* (int (/ offset index-step)) index-step)
-            stop-offset (+ start-offset index-step)
-            extra (- offset start-offset)
-            stop-offset (if (= extra 99) (+ stop-offset index-step) stop-offset)]
-        (read-chunk reader line-index start-offset stop-offset (when-not initial extra))))))
+(defn read-stream [{:keys [^java.io.InputStream reader index-cache file]} offset history]
+  (locking file (let [line-index (:line-index index-cache)]
+     (if history
+       (read-history reader line-index history)
+       (let [initial (nil? offset)
+             offset (if (nil? offset)
+                      (:lines-count index-cache)
+                      (if (< offset index-step) offset (+ offset 1)))
+             start-offset (* (int (/ offset index-step)) index-step)
+             stop-offset (+ start-offset index-step)
+             extra (- offset start-offset)
+             stop-offset (if (= extra 99) (+ stop-offset index-step) stop-offset)]
+         (read-chunk reader line-index start-offset stop-offset (when-not initial extra)))))))
+
+(defn write-index-stream [{:keys [^java.io.Writer index-writer]} count length]
+  (let [need-index (= 0 (mod count index-step))]
+    (when need-index
+      (do
+        (.write index-writer (str count " " length "\n"))
+        (.flush index-writer)
+        {count length}))))
+
+(defn write-data-stream [{:keys [^java.io.Writer writer]} message]
+  (let [data (json/generate-string message)
+        writed (+ (count data) 1)]
+    (.write writer data)
+    (.write writer "\n")
+    (.flush writer)
+    writed))

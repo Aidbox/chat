@@ -1,7 +1,7 @@
 (ns app.core
   (:require [app.web]
-            [org.httpkit.server :as httpkit]
-            [app.cache :as cache]))
+            [app.cache]
+            [org.httpkit.server :as httpkit]))
 
 (set! *warn-on-reflection* true)
 
@@ -20,7 +20,7 @@
 
 (defn restart []
   (stop-server)
-  (reset! cache/topics {})
+  (app.cache/reset-cache!)
   (start-server)
   )
 

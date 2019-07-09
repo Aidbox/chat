@@ -30,8 +30,12 @@
 
   (do
     (do
-      (io/delete-file "./data/foo.data")
-      (io/delete-file "./data/foo.index")
+      (try
+        (io/delete-file (str "./data/foo.data"))
+        (catch Exception e nil))
+      (try
+        (io/delete-file (str "./data/foo.index"))
+        (catch Exception e nil))
       (app/restart))
     (do (println "WRITE ==================")
         (time (insert-n 10000))
