@@ -21,12 +21,12 @@
   (let [file-config (get-file-config filename)
         file (get file-config :file)]
     (locking file
-      (let[message (assoc message
-                          :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
-                          :timestamp (str (time/now)))
-           writed (persist/write-data-stream file-config message)
-           {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
-           new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
+      (let [message (assoc message
+                           :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
+                           :timestamp (str (time/now)))
+            writed (persist/write-data-stream file-config message)
+            {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
+            new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
         (update-cache-index filename
                             {:lines-count (+ 1 lines-count)
                              :length (+ writed length)

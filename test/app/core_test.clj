@@ -36,19 +36,19 @@
 
   (testing "Read initial"
     (let [{:keys [status body]} (read)
-          lines (map json/parse-string (str/split body #"\n"))]
+          lines (map #(json/parse-string % keyword) (str/split body #"\n"))]
       (is (= status 200))
       (is (= (count lines) 5))
-      (matcho/match lines [{"message-index" 1}
-                           {"message-index" 2}
-                           {"message-index" 3}
-                           {"message-index" 4}
-                           {"message-index" 5}])))
+      (matcho/match lines [{:message-index 1}
+                           {:message-index 2}
+                           {:message-index 3}
+                           {:message-index 4}
+                           {:message-index 5}])))
 
   (testing "Read offset"
     (let [{:keys [status body]} (read 3)
-          lines (map json/parse-string (str/split body #"\n"))]
+          lines (map #(json/parse-string % keyword) (str/split body #"\n"))]
       (is (= status 200))
       (is (= (count lines) 2))
-      (matcho/match lines [{"message-index" 4}
-                           {"message-index" 5}]))))
+      (matcho/match lines [{:message-index 4}
+                           {:message-index 5}]))))
