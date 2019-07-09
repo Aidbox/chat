@@ -18,15 +18,16 @@
 
 (defn batch-operation [filename body]
   (let [request (json/parse-string body keyword)]
-    (println request))
-  {:status 200
-   :body "OK"})
+    {:status 200
+     :body (map (fn [{:keys [id offset history]}]
+                  {:id id
+                   :messages (cache/read-messages id offset history )})
+                (:chats request))}))
 
 (defn app [req]
   (let [{uri :uri action :request-method} req
         parts (str/split uri #"/")
         filename (subs uri 1)]
-    ;; (println parts)
     (case uri
       "/" (if (= action :get)
             (index)
