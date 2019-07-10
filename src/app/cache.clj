@@ -15,7 +15,10 @@
   (let [file-config (@topics filename)]
     (if file-config
       file-config
-      (get (swap! topics #(assoc % filename (persist/setup-config filename))) filename))))
+      (get (swap! topics #(assoc % filename (persist/load-config filename))) filename))))
+
+(defn create-room [filename room-data]
+  (swap! topics #(assoc % filename (persist/init-config filename room-data))))
 
 (defn write-message [filename message]
   (let [file-config (get-file-config filename)

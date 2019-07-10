@@ -26,32 +26,39 @@
 
 (defn app [req]
   (let [{uri :uri action :request-method} req
-        parts (str/split uri #"/")
-        filename (subs uri 1)]
+        [_ filename](str/split uri #"/")]
     (case uri
       "/" (if (= action :get)
             (index)
             (batch-operation filename (slurp (:body req))))
-      (httpkit/with-channel req channel
-        (let [params (parse-quesrystring (:query-string req))]
-          (if (= action :post)
-            (do
-              (cache/write-message filename (json/parse-string (slurp (:body req)) keyword))
-              (httpkit/send! channel {:status 200
-                                      :headers {"Content-Type" "text/html"
-                                                "Access-Control-Allow-Origin" "*"}
-                                      :body ""}))
-            (let [{:keys [offset history]} params
-                  offset (when offset (Integer/parseInt offset))
-                  history (when history (Integer/parseInt history))]
-              (if (not (or (nil? offset) (nil? history)))
-                (httpkit/send! channel {:status 422
-                                        :headers {"Content-Type" "text/html"}})
-                (httpkit/send! channel {:status 200
-                                        :headers {"Content-Type" "text/html"
-                                                  "Access-Control-Allow-Origin" "*"}
-                                        :body (cache/read-messages filename offset history)}))))
-          (httpkit/close channel))))))
+      (let [params (parse-quesrystring (:query-string req))]
+        (if (= action :post)
+          (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)]
+            (case action
+              "createMessage" (do
+                                (cache/write-message filename data)
+                                {:status 200
+                                 :headers {"Content-Type" "text/html"
+                                           "Access-Control-Allow-Origin" "*"}
+                                 :body ""})
+              "createRoom" (do
+                             (cache/create-room filename data)
+                             {:status 201
+                              :headers {"Content-Type" "text/html"
+                                        "Access-Control-Allow-Origin" "*"}
+                              :body ""})
+              {:status 422
+               :headers {"Content-Type" "text/html"}}))
+          (let [{:keys [offset history]} params
+                offset (when offset (Integer/parseInt offset))
+                history (when history (Integer/parseInt history))]
+            (if (not (or (nil? offset) (nil? history)))
+              {:status 422
+               :headers {"Content-Type" "text/html"}}
+              {:status 200
+               :headers {"Content-Type" "text/html"
+                         "Access-Control-Allow-Origin" "*"}
+               :body (cache/read-messages filename offset history)})))))))
 
 (comment
   BATCH Request

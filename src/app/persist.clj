@@ -21,50 +21,69 @@
           start)))))
 
 (defn load-index-cache [file ^java.io.File index-file]
-  (try
-    (if (.exists index-file)
-      (let [lines (str/split (slurp index-file) #"\n")
-            pairs (if (= lines [""])
-                    [[0 0]]
-                    (->> lines
-                        (map #(str/split % #" "))
-                        (map (fn [[k v]]
-                               [(Integer/parseInt k)
-                                (Integer/parseInt v)]))
-                        (into [[0 0]])))
-            [last-index last-offset] (last pairs)
-            line-index (into {} pairs)]
-        {:lines-count (+ last-index (count-extra-lines file last-offset))
-         :length (with-open [reader (io/input-stream file)]
-                   (.available reader))
-         :last-index last-index
-         :line-index line-index})
-      {:lines-count (count-extra-lines file 0)
-       :length (with-open [reader (io/input-stream file)]
-                 (.available reader))
-       :last-index 0
-       :line-index {}})
-  (catch Exception e nil)))
+  (let [lines (str/split (slurp index-file) #"\n")
+        pairs (if (= lines [""])
+                [[0 0]]
+                (->> lines
+                     (map #(str/split % #" "))
+                     (map (fn [[k v]]
+                            [(Integer/parseInt k)
+                             (Integer/parseInt v)]))
+                     (into [[0 0]])))
+        [last-index last-offset] (last pairs)
+        line-index (into {} pairs)]
+    {:lines-count (+ last-index (count-extra-lines file last-offset))
+     :length (with-open [reader (io/input-stream file)]
+               (.available reader))
+     :last-index last-index
+     :line-index line-index})
+  {:lines-count (count-extra-lines file 0)
+   :length (with-open [reader (io/input-stream file)]
+             (.available reader))
+   :last-index 0
+   :line-index {}})
 
-(defn setup-config [filename]
+(defn load-config [filename]
   (let [base-filename (str "./data/" filename)
-        file (io/file (str base-filename ".data"))
-        index-file (io/file (str base-filename ".index"))
-        index-cache (load-index-cache file index-file)
-        index-cache (if index-cache
-                      index-cache
-                      {:lines-count 0
+        info-file (io/file (str base-filename ".info"))]
+    (if (.exists info-file)
+      (let [index-file (io/file (str base-filename ".index"))
+            file (io/file (str base-filename ".data"))
+            index-cache (load-index-cache file index-file)
+            index-cache (if index-cache
+                          index-cache
+                          {:lines-count 0
+                           :last-index 0
+                           :length 0
+                           :line-index {0 0}})
+            index-writer (io/writer index-file :append true)
+            writer (io/writer file :append true)
+            reader (io/input-stream file)]
+        {:file file
+         :room-data (json/parse-string (slurp info-file) keyword)
+         :index-cache index-cache
+         :index-writer index-writer
+         :writer writer
+         :reader reader})
+      (throw (Exception. (str "Room " filename " doesn't exist"))))))
+
+(defn init-config [filename room-data]
+  (let [base-filename (str "./data/" filename)
+        info-file (io/file (str base-filename ".info"))]
+    (if (.exists info-file)
+      (throw (Exception. (str "Room " filename " already exists")))
+      (let [file (io/file (str base-filename ".data"))
+            index-file (io/file (str base-filename ".index"))]
+        (spit info-file (json/generate-string room-data))
+        {:file file
+         :room-data room-data
+         :index-cache {:lines-count 0
                        :last-index 0
                        :length 0
-                       :line-index {0 0}})
-        index-writer (io/writer index-file :append true)
-        writer (io/writer file :append true)
-        reader (io/input-stream file)]
-    {:file file
-     :index-cache index-cache
-     :index-writer index-writer
-     :writer writer
-     :reader reader}))
+                       :line-index {0 0}}
+         :index-writer (io/writer index-file :append true)
+         :writer (io/writer file :append true)
+         :reader (io/input-stream file)}))))
 
 (defn read-chunk [^java.io.InputStream stream line-index start-offset stop-offset & [extra-skip]]
   (.mark stream (+ 1 (.available stream)))

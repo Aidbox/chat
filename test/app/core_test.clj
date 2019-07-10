@@ -16,11 +16,14 @@
   (try
     (io/delete-file (str "./data/" test-room ".index"))
     (catch Exception e nil))
-  (sut/restart))
+  (sut/restart)
+  (httpkit/post (str "http://localhost:8080/" test-room)
+                {:body (json/generate-string {:action "createRoom" :data {:room "metadata"}})})
+  )
 
 (defn insert [message]
   @(httpkit/post (str "http://localhost:8080/" test-room)
-                 {:body (json/generate-string message)}))
+                 {:body (json/generate-string {:action "createMessage" :data message})}))
 
 (defn read [& [offset]]
   @(httpkit/get (str "http://localhost:8080/" test-room) (when offset {:query-params {:offset offset}})))
