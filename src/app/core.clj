@@ -3,8 +3,6 @@
             [app.cache]
             [org.httpkit.server :as httpkit]))
 
-(set! *warn-on-reflection* true)
-
 (defonce server (atom nil))
 
 (defn stop-server []

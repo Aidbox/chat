@@ -88,4 +88,10 @@
       (is (= status 200))
       (is (= (count lines) 2))
       (matcho/match lines [{:message-index 104}
-                           {:message-index 105}]))))
+                           {:message-index 105}])))
+
+  (testing "History"
+    (let [{:keys [status body]} (utils/read test-room {:history 100})
+          lines (parse-messages body)]
+      (is (= status 200))
+      (is (= (count lines) 99)))))

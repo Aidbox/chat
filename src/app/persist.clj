@@ -6,6 +6,8 @@
            java.io.InputStream
            java.io.Writer))
 
+(set! *warn-on-reflection* true)
+
 (def index-step 100)
 
 (defn count-extra-lines [file offset]
@@ -85,26 +87,27 @@
          :writer (io/writer file :append true)
          :reader (io/input-stream file)}))))
 
-(defn read-chunk [^java.io.InputStream stream line-index start-offset stop-offset & [extra-skip]]
-  (.mark stream (+ 1 (.available stream)))
+(defn read-chunk [^java.io.InputStream stream max-length line-index start-offset stop-offset & [extra-skip]]
+  (.mark stream (+ 1 max-length))
   (let [start-binary-offset (get line-index start-offset)
-        stop-binary-offset (get line-index stop-offset (.available stream))
+        stop-binary-offset (get line-index stop-offset max-length)
         length (- stop-binary-offset start-binary-offset)
         out-stream (java.io.StringWriter.)
-        bytes (byte-array (min length (.available stream)))]
+        bytes (byte-array (min length max-length))]
     (.skip stream start-binary-offset)
     (.read stream bytes)
     (io/copy bytes out-stream)
     (.reset stream)
     (str/join "\n" (drop (or extra-skip 0) (str/split (.toString out-stream) #"\n")))))
 
-(defn read-history [^java.io.InputStream stream line-index history-index]
-  (read-chunk stream line-index (- history-index index-step) history-index))
+(defn read-history [^java.io.InputStream stream max-length line-index history-index]
+  (read-chunk stream max-length line-index (- history-index index-step) history-index))
 
-(defn read-stream [{:keys [^java.io.InputStream reader index-cache]} offset history]
-  (let [line-index (:line-index index-cache)]
+(defn read-stream [{:keys [^java.io.InputStream reader index-cache ^java.io.File file]} offset history]
+  (let [line-index (:line-index index-cache)
+        max-length (.length file)]
     (if history
-      (read-history reader line-index history)
+      (read-history reader max-length line-index history)
       (let [initial (nil? offset)
             offset (if (nil? offset)
                      (:lines-count index-cache)
@@ -113,7 +116,7 @@
             stop-offset (+ start-offset index-step)
             extra (- offset start-offset)
             stop-offset (if (= extra 99) (+ stop-offset index-step) stop-offset)]
-        (read-chunk reader line-index start-offset stop-offset (when-not initial extra))))))
+        (read-chunk reader max-length line-index start-offset stop-offset (when-not initial extra))))))
 
 (defn write-index-stream [{:keys [^java.io.Writer index-writer]} count length]
   (let [need-index (= 0 (mod count index-step))]
