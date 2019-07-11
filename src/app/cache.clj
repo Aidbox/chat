@@ -48,8 +48,10 @@
 (defn read-messages [filename {:keys [userId offset history viewed typing]}]
   (let [file-config (get-file-config filename)]
     (locking (:file file-config)
-      {:users (update-user-info filename userId viewed typing)
-       :messages (persist/read-stream file-config offset history)})))
+      (let [room-data (update-user-info filename userId viewed typing)]
+        (persist/write-room-data file-config room-data)
+        {:users room-data
+         :messages (persist/read-stream file-config offset history)}))))
 
 (comment
   (get-in @topics ["test-room" :room-data])

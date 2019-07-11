@@ -62,6 +62,7 @@
             writer (io/writer file :append true)
             reader (io/input-stream file)]
         {:file file
+         :info-file info-file
          :room-data (json/parse-string (slurp info-file) keyword)
          :index-cache index-cache
          :index-writer index-writer
@@ -78,6 +79,7 @@
             index-file (io/file (str base-filename ".index"))]
         (spit info-file (json/generate-string room-data))
         {:file file
+         :info-file info-file
          :room-data room-data
          :index-cache {:lines-count 0
                        :last-index 0
@@ -133,3 +135,6 @@
     (.write writer "\n")
     (.flush writer)
     writed))
+
+(defn write-room-data [{:keys [info-file]} room-data]
+  (spit info-file (json/generate-string room-data)))
