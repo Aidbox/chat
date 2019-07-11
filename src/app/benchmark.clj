@@ -1,42 +1,58 @@
 (ns app.benchmark
   (:require [org.httpkit.client :as httpkit]
+            [cheshire.core :as json]
             [clojure.java.io :as io]
             [app.core :as app]))
 
+(def benchmark-room-name "benchmark")
+
+(defn clear-data []
+  (->> "./data"
+      io/file
+      file-seq
+      (drop 1)
+      (map io/delete-file)
+      doall))
+
+(defn create-room [room & [meatadata]]
+  @(httpkit/post (str "http://localhost:8080/" room)
+                 {:body (json/generate-string {:action "createRoom" :data (into {} meatadata)})}))
+
+(defn insert [room message]
+  @(httpkit/post (str "http://localhost:8080/" room)
+                 {:body (json/generate-string {:action "createMessage" :data message})}))
+
+(defn read [room & [params]]
+  @(httpkit/post "http://localhost:8080/"
+                 {:body (json/generate-string
+                         {:userId "test-client"
+                          :chats [(into {:id room} params)]})}))
 (defn insert-n [n]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/post "http://localhost:8080/foo" {:body (str "{\"text\": \"hello " i "\"}")}) ]
-       nil)))
+     (insert benchmark-room-name {:text (str "hello " i)})))
   nil)
 
 (defn read-n [n & [offset]]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/get "http://localhost:8080/foo" (when offset {:query-params {:offset offset}}))]
-       nil)))
+     (read benchmark-room-name (when offset {:offset offset}))))
   nil)
 
 (defn history-n [n history]
   (doall
    (for [i (range 0 n)]
-     (let [resp @(httpkit/get "http://localhost:8080/foo" {:query-params {:history history}})]
-       nil)))
+     (read benchmark-room-name {:history history})))
   nil)
 
-
-
 (comment
-
   (do
+    (println "STARTING ==================")
     (do
-      (try
-        (io/delete-file (str "./data/foo.data"))
-        (catch Exception e nil))
-      (try
-        (io/delete-file (str "./data/foo.index"))
-        (catch Exception e nil))
-      (app/restart))
+        (clear-data)
+        (app/restart)
+        (create-room benchmark-room-name)
+        nil)
     (do (println "WRITE ==================")
         (time (insert-n 10000))
         (time (insert-n 10000))
@@ -82,6 +98,7 @@
         (time (history-n 10000 99800))
         (time (history-n 10000 99800))
         (time (history-n 10000 99800)))
+    (println "DONE ==================")
     )
 
   )
