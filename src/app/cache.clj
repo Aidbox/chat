@@ -36,24 +36,36 @@
                              :last-index (or (second new-index) last-index)
                              :line-index (into line-index new-index)})))))
 
+(defn get-persist-data [users]
+  (->> users
+       (map (fn [[id data]] [id (select-keys data [:viewed])]))
+       (into {})))
+
 (defn update-user-info [filename userId viewed typing]
-  (get-in
-   (swap! topics
-          update-in [filename :room-data :users userId]
-          assoc :viewed viewed
-                :typing typing
-                :last-active (time/now))
-   [filename :room-data :users]))
+  (let [old-room-data (get-in @topics [filename :room-data])
+        old (get-persist-data (get-in @topics [filename :room-data :users]))
+        new (get-persist-data (get-in
+                               (swap! topics
+                                      update-in [filename :room-data :users userId]
+                                      assoc :viewed (or viewed (get-in @topics [filename :room-data :users userId :viewed]))
+                                      :typing typing
+                                      :last-active (time/now))
+                               [filename :room-data :users]))]
+    (when (not= old new)
+      (assoc old-room-data :users new))))
 
 (defn read-messages [filename {:keys [userId offset history viewed typing]}]
   (let [file-config (get-file-config filename)]
     (locking (:file file-config)
-      (let [room-data (update-user-info filename userId viewed typing)]
-        (persist/write-room-data file-config room-data)
-        {:users room-data
-         :messages (persist/read-stream file-config offset history)}))))
+      (let [persist-room-data (update-user-info filename userId viewed typing)]
+        (when persist-room-data
+          (persist/write-room-data file-config persist-room-data))
+        (assoc
+         (get-in @topics [filename :room-data])
+         :messages (persist/read-stream file-config offset history))))))
 
 (comment
   (get-in @topics ["test-room" :room-data])
-
+  (get-in @topics ["benchmark" :room-data])
+  
   )

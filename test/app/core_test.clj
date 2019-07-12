@@ -94,4 +94,16 @@
     (let [{:keys [status body]} (utils/read test-room {:history 100})
           lines (parse-messages body)]
       (is (= status 200))
-      (is (= (count lines) 99)))))
+      (is (= (count lines) 99))))
+
+  (testing "Viewed"
+    (let [{:keys [status body]} (utils/read test-room {:offset 103, :viewed 103})
+          chat (first (json/parse-string (slurp body) keyword))]
+      (is (= status 200))
+      (is (= (get-in chat [:users :test-client :viewed]) 103)))
+    (sut/restart)
+    (let [{:keys [status body]} (utils/read test-room)
+          chat (first (json/parse-string (slurp body) keyword))]
+      (is (= status 200))
+      (is (= (get-in chat [:users :test-client :viewed]) 103)))
+    ))

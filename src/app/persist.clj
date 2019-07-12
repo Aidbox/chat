@@ -38,12 +38,7 @@
      :length (with-open [reader (io/input-stream file)]
                (.available reader))
      :last-index last-index
-     :line-index line-index})
-  {:lines-count (count-extra-lines file 0)
-   :length (with-open [reader (io/input-stream file)]
-             (.available reader))
-   :last-index 0
-   :line-index {0 0}})
+     :line-index line-index}))
 
 (defn load-config [filename]
   (let [base-filename (str "./data/" filename)

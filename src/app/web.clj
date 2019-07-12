@@ -26,7 +26,7 @@
   {:status 200
    :body (json/generate-string
           (map (fn [{id :id :as meta}]
-                 (assoc (cache/read-messages id (assoc meta :userId userId))
+                 (assoc (cache/read-messages id (assoc meta :userId (keyword userId)))
                         :id id))
                chats))})
 

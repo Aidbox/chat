@@ -33,11 +33,13 @@
      (insert benchmark-room-name {:text (str "hello " i)})))
   nil)
 
-(defn read-n [n & [offset]]
+(defn read-n [n & [offset viewed]]
   (doall
    (for [i (range 0 n)]
-     (read benchmark-room-name (when offset {:offset offset}))))
-  nil)
+     (read benchmark-room-name (merge
+                                {}
+                                (when offset {:offset offset})
+                                (when viewed {:viewed n}))))) nil)
 
 (defn history-n [n history]
   (doall
@@ -87,6 +89,17 @@
         (time (read-n 10000 99999))
         (time (read-n 10000 99999))
         (time (read-n 10000 99999)))
+    (do (println "READ VIEWED ==================")
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true))
+        (time (read-n 10000 99999 true)))
     (do (println "READ HISTORY ==================")
         (time (history-n 10000 99800))
         (time (history-n 10000 99800))
