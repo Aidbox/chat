@@ -125,7 +125,7 @@
 
 (defn write-data-stream [{:keys [^java.io.Writer writer]} message]
   (let [data (json/generate-string message)
-        writed (+ (count data) 1)]
+        writed (+ (alength (.getBytes data)) 1)]
     (.write writer data)
     (.write writer "\n")
     (.flush writer)
