@@ -21,10 +21,12 @@
   (swap! topics #(assoc % filename (persist/init-config filename room-data))))
 
 (defn write-message [filename message]
-  (let [file-config (get-file-config filename)
-        file (get file-config :file)]
+  (let [file (get (get-file-config filename) :file)]
     (locking file
-      (let [message (assoc message
+      (let [file-config (get-file-config filename) ;; if we was locked,
+                                                   ;; cache could be changed
+                                                   ;; we need to reload cache
+            message (assoc message
                            :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
                            :timestamp (str (time/now)))
             writed (persist/write-data-stream file-config message)
