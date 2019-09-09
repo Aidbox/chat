@@ -1,6 +1,7 @@
 (ns app.web
   (:require [clojure.string :as str]
             [app.cache :as cache]
+            [org.httpkit.client :as httpkit-client]
             [org.httpkit.server :as httpkit]
             [cheshire.core :as json]
             [cheshire.generate :as json-proto]))
@@ -22,7 +23,7 @@
   {:status 200
    :body (slurp "./resources/html/index.html")})
 
-(defn batch-operation [filename {:keys [userId chats]}]
+(defn batch-operation [{:keys [userId chats]}]
   {:status 200
    :body (json/generate-string
           (map (fn [{id :id :as meta}]
@@ -30,35 +31,97 @@
                         :id id))
                chats))})
 
-(defn app [req]
-  (let [{uri :uri action :request-method} req
-        [_ filename](str/split uri #"/")]
+(defonce auth (atom {}))
+
+(def public (= (get (System/getenv) "PUBLIC") "true"))
+(def chat-secret (get (System/getenv) "CHAT_SECRET"))
+(def chat-auth-remote (get (System/getenv) "CHAT_AUTH_REMOTE"))
+
+(defn extract-chats [req]
+  (let [{uri :uri action :request-method headers :headers} req]
     (case uri
-      "/" (if (= action :get)
-            (index)
-            (batch-operation filename (json/parse-string (slurp (:body req)) keyword)))
-      (let [params (parse-quesrystring (:query-string req))]
-        (if (= action :post)
-          (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)]
-            (case action
-              "createMessage" (do
-                                (cache/write-message filename data)
-                                {:status 200
-                                 :headers {"Content-Type" "text/html"
-                                           "Access-Control-Allow-Origin" "*"}
-                                 :body ""})
-              "createRoom" (do
-                             (cache/create-room filename data)
-                             {:status 201
-                              :headers {"Content-Type" "text/html"
-                                        "Access-Control-Allow-Origin" "*"}
-                              :body ""})
-              {:status 422
-               :headers {"Content-Type" "text/html"}}))
-          {:status 422
-           :headers {"Content-Type" "text/html"}})))))
+      "/" (if (= action :post)
+            (let [data (json/parse-string (slurp (:body req)) keyword)]
+              (set (map :id (:chats data))))
+              (set []))
+      (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)
+            [_ filename](str/split uri #"/")]
+        (case action
+          "createMessage" (set [filename])
+          false)))))
+
+
+(defn check-auth [authorization req]
+  (if-let [auth-data (get @auth authorization)]
+    (let [chats (extract-chats req)]
+      (if (clojure.set/subset? chats auth-data)
+        true
+        (let [chats (extract-chats req)
+              body {:chats chats}
+              response @(httpkit-client/post
+                         chat-auth-remote
+                         {:headers {"authorization" authorization
+                                    "content-type" "application/json"}
+                          :method :post
+                          :body (json/generate-string body)})]
+          (if (= (:status response) 200)
+            (swap! auth assoc authorization chats)
+            false))))
+    (when (= (:uri req) "/")
+      (let [chats (extract-chats req)
+            body {:chats chats}
+            response @(httpkit-client/post
+                       chat-auth-remote
+                       {:headers {"authorization" authorization
+                                  "content-type" "application/json"}
+                        :method :post
+                        :body (json/generate-string body)})]
+        (if (= (:status response) 200)
+          (swap! auth assoc authorization chats)
+          false)))))
+
+(defn is-authorized [req]
+  (let [authorization (get (:headers req) "authorization")]
+    (or public
+        (and authorization
+             (or
+              (= chat-secret authorization)
+              (check-auth authorization req))))))
+
+(defn app [req]
+  (let [{uri :uri action :request-method headers :headers} req]
+    (if (is-authorized req)
+      (case uri
+        "/" (if (= action :get)
+              (index)
+              (batch-operation (json/parse-string (slurp (:body req)) keyword)))
+        (let [params (parse-quesrystring (:query-string req))]
+          (if (= action :post)
+            (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)
+                  [_ filename](str/split uri #"/")]
+              (case action
+                "createMessage" (do
+                                  (cache/write-message filename data)
+                                  {:status 200
+                                   :headers {"Content-Type" "text/html"
+                                             "Access-Control-Allow-Origin" "*"}
+                                   :body ""})
+                "createRoom" (do
+                               (cache/create-room filename data)
+                               {:status 201
+                                :headers {"Content-Type" "text/html"
+                                          "Access-Control-Allow-Origin" "*"}
+                                :body ""})
+                {:status 422
+                 :headers {"Content-Type" "text/html"}}))
+            {:status 422
+             :headers {"Content-Type" "text/html"}})))
+      {:status 403
+       :headers {"Content-Type" "text/html"}})))
 
 (comment
+  (reset! auth {})
+
   BATCH Request
   {:userId "1q2w3e4r"
    :chats [{:id "room-1"
