@@ -1,5 +1,6 @@
 (ns app.web
   (:require [clojure.string :as str]
+            [clojure.set :as clojure_set]
             [app.cache :as cache]
             [org.httpkit.client :as httpkit-client]
             [org.httpkit.server :as httpkit]
@@ -54,7 +55,7 @@
 (defn check-auth [authorization req]
   (if-let [auth-data (get @auth authorization)]
     (let [chats (extract-chats req)]
-      (if (clojure.set/subset? chats auth-data)
+      (if (clojure_set/subset? chats auth-data)
         true
         (let [chats (extract-chats req)
               body {:chats chats}
