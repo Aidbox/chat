@@ -41,10 +41,10 @@
   (let [{uri :uri action :request-method headers :headers} req]
     (case uri
       "/" (if (= action :post)
-            (let [data (json/parse-string (slurp (:body req)) keyword)]
+            (let [data (:body req)]
               (set (map :id (:chats data))))
               (set []))
-      (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)
+      (let [{:keys [action data]} (:body req)
             [_ filename](str/split uri #"/")]
         (case action
           "createMessage" (set [filename])
@@ -89,15 +89,16 @@
               (check-auth authorization req))))))
 
 (defn app [req]
-  (let [{uri :uri action :request-method headers :headers} req]
+  (let [{uri :uri action :request-method headers :headers} req
+        req (assoc req :body (json/parse-string (slurp (:body req)) keyword))]
     (if (is-authorized req)
       (case uri
         "/" (if (= action :get)
               (index)
-              (batch-operation (json/parse-string (slurp (:body req)) keyword)))
+              (batch-operation (:body req)))
         (let [params (parse-quesrystring (:query-string req))]
           (if (= action :post)
-            (let [{:keys [action data]} (json/parse-string (slurp (:body req)) keyword)
+            (let [{:keys [action data]} (:body req)
                   [_ filename](str/split uri #"/")]
               (case action
                 "createMessage" (do
