@@ -91,7 +91,8 @@
 
 (defn app [req]
   (let [{uri :uri action :request-method headers :headers} req
-        req (assoc req :body (json/parse-string (slurp (:body req)) keyword))]
+        req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
+        authorization (get (:headers req) "authorization")]
     (if (is-authorized req)
       (case uri
         "/" (if (= action :get)
@@ -103,7 +104,7 @@
                   [_ filename](str/split uri #"/")]
               (case action
                 "createMessage" (do
-                                  (cache/write-message filename data)
+                                  (cache/write-message filename data authorization)
                                   {:status 200
                                    :headers {"Content-Type" "text/html"
                                              "Access-Control-Allow-Origin" "*"}

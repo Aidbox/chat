@@ -1,5 +1,7 @@
 (ns app.cache
   (:require [app.persist :as persist]
+            [org.httpkit.client :as httpkit-client]
+            [cheshire.core :as json]
             [clj-time.core :as time]))
 
 
@@ -20,7 +22,33 @@
 (defn create-room [filename room-data]
   (swap! topics #(assoc % filename (persist/init-config filename room-data))))
 
-(defn write-message [filename message]
+
+(def chat-push-notification (get (System/getenv) "CHAT_PUSH_NOTIFICATION"))
+
+(defn send-notification [chat-name offline-users message authorization]
+  (httpkit-client/post
+   chat-push-notification
+   {:headers {"authorization" authorization
+              "content-type" "application/json"}
+    :method :post
+    :body (json/generate-string {:users offline-users :message message :chat chat-name})}
+   (fn [{:keys [status body]}]
+     (when (not= status 200)
+       (println status body)))))
+
+(defn notify-offline-users [chat-name file-config message authorization]
+  (let [now (time/now)
+        offline-users (filter
+                       (complement nil?)
+                       (for [[id {:keys [viewed last-active]}] (get-in file-config [:room-data :users])]
+                         (if (nil? last-active)
+                           id
+                           (when (> (time/in-msecs (time/interval last-active now)) 2000)
+                             id))))]
+    (when (count offline-users)
+      (send-notification chat-name offline-users message authorization))))
+
+(defn write-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
     (locking file
       (let [file-config (get-file-config filename) ;; if we was locked,
@@ -32,6 +60,7 @@
             writed (persist/write-data-stream file-config message)
             {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
             new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
+        (notify-offline-users filename file-config message authorization)
         (update-cache-index filename
                             {:lines-count (+ 1 lines-count)
                              :length (+ writed length)
@@ -69,5 +98,8 @@
 (comment
   (get-in @topics ["test-room" :room-data])
   (get-in @topics ["benchmark" :room-data])
-  
+
+  (:id (:chat (:room-data @debug)))
+
   )
+
