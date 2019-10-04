@@ -37,10 +37,10 @@
       (is (= status 200))
       (is (= (count lines) 5))
       (matcho/match lines [{:message-index 1}
-                           {:message-index 2}
-                           {:message-index 3}
-                           {:message-index 4}
-                           {:message-index 5}])))
+                            {:message-index 2}
+                            {:message-index 3}
+                            {:message-index 4}
+                            {:message-index 5}])))
 
   (testing "Read offset"
     (let [{:keys [status body]} (utils/read test-room {:offset 3})
@@ -48,11 +48,11 @@
       (is (= status 200))
       (is (= (count lines) 2))
       (matcho/match lines [{:message-index 4}
-                           {:message-index 5}])))
+                            {:message-index 5}])))
 
   (testing "Create many message"
     (doall (for [i (range 0 100)]
-             (matcho/match (utils/insert test-room {:text "hello"}) {:status 200}))))
+              (matcho/match (utils/insert test-room {:text "hello"}) {:status 200}))))
 
   (testing "Read initial from big chat"
     (parse-messages (:body (utils/read test-room))) ;; TODO warmup buffer to fix init issues
@@ -61,11 +61,11 @@
       (is (= status 200))
       (is (= (count lines) 6))
       (matcho/match lines [{:message-index 100}
-                           {:message-index 101}
-                           {:message-index 102}
-                           {:message-index 103}
-                           {:message-index 104}
-                           {:message-index 105}])))
+                            {:message-index 101}
+                            {:message-index 102}
+                            {:message-index 103}
+                            {:message-index 104}
+                            {:message-index 105}])))
 
   (testing "Read offset"
     (let [{:keys [status body]} (utils/read test-room {:offset 98})
@@ -78,17 +78,17 @@
       (is (= status 200))
       (is (= (count lines) 6))
       (matcho/match lines [{:message-index 100}
-                           {:message-index 101}
-                           {:message-index 102}
-                           {:message-index 103}
-                           {:message-index 104}
-                           {:message-index 105}]))
+                            {:message-index 101}
+                            {:message-index 102}
+                            {:message-index 103}
+                            {:message-index 104}
+                            {:message-index 105}]))
     (let [{:keys [status body]} (utils/read test-room {:offset 103})
           lines (parse-messages body)]
       (is (= status 200))
       (is (= (count lines) 2))
       (matcho/match lines [{:message-index 104}
-                           {:message-index 105}])))
+                            {:message-index 105}])))
 
   (testing "History"
     (let [{:keys [status body]} (utils/read test-room {:history 100})

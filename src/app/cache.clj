@@ -26,15 +26,16 @@
 (def chat-push-notification (get (System/getenv) "CHAT_PUSH_NOTIFICATION"))
 
 (defn send-notification [chat-name offline-users message authorization]
-  (httpkit-client/post
-   chat-push-notification
-   {:headers {"authorization" authorization
-              "content-type" "application/json"}
-    :method :post
-    :body (json/generate-string {:users offline-users :message message :chat chat-name})}
-   (fn [{:keys [status body]}]
-     (when (not= status 200)
-       (println status body)))))
+  (when chat-push-notification
+    (httpkit-client/post
+     chat-push-notification
+     {:headers {"authorization" authorization
+                "content-type" "application/json"}
+      :method :post
+      :body (json/generate-string {:users offline-users :message message :chat chat-name})}
+     (fn [{:keys [status body]}]
+       (when (not= status 200)
+         (println status body))))))
 
 (defn notify-offline-users [chat-name file-config message authorization]
   (let [now (time/now)

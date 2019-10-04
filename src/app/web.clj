@@ -34,7 +34,6 @@
 
 (defonce auth (atom {}))
 
-(def public (= (get (System/getenv) "PUBLIC") "true"))
 (def chat-secret (get (System/getenv) "CHAT_SECRET"))
 (def chat-auth-remote (get (System/getenv) "CHAT_AUTH_REMOTE"))
 
@@ -83,11 +82,9 @@
 
 (defn is-authorized [req]
   (let [authorization (get (:headers req) "authorization")]
-    (or public
-        (and authorization
-             (or
-              (= chat-secret authorization)
-              (check-auth authorization req))))))
+    (or
+     (= chat-secret authorization)
+     (check-auth authorization req))))
 
 (defn app [req]
   (let [{uri :uri action :request-method headers :headers} req
