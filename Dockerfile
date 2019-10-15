@@ -5,7 +5,7 @@ WORKDIR /app
 ADD . /app
 
 # Build
-RUN clj -A:uberjar
+RUN clojure -A:uberjar
 
 #RUN zip -d /app/app.jar 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*SF'
 

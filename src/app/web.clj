@@ -87,37 +87,38 @@
      (check-auth authorization req))))
 
 (defn app [req]
-  (let [{uri :uri action :request-method headers :headers} req
-        req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
-        authorization (get (:headers req) "authorization")]
-    (if (is-authorized req)
-      (case uri
-        "/" (if (= action :get)
-              (index)
-              (batch-operation (:body req)))
-        (let [params (parse-quesrystring (:query-string req))]
-          (if (= action :post)
-            (let [{:keys [action data]} (:body req)
-                  [_ filename](str/split uri #"/")]
-              (case action
-                "createMessage" (do
-                                  (cache/write-message filename data authorization)
-                                  {:status 200
-                                   :headers {"Content-Type" "text/html"
-                                             "Access-Control-Allow-Origin" "*"}
-                                   :body ""})
-                "createRoom" (do
-                               (cache/create-room filename data)
-                               {:status 201
-                                :headers {"Content-Type" "text/html"
-                                          "Access-Control-Allow-Origin" "*"}
-                                :body ""})
+  (let [{uri :uri action :request-method headers :headers} req]
+    (if (and (= uri "/")
+             (= action :get))
+      (index)
+      (let[req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
+           authorization (get (:headers req) "authorization")]
+        (if (is-authorized req)
+          (case uri
+            "/" (batch-operation (:body req))
+            (let [params (parse-quesrystring (:query-string req))]
+              (if (= action :post)
+                (let [{:keys [action data]} (:body req)
+                      [_ filename](str/split uri #"/")]
+                  (case action
+                    "createMessage" (do
+                                      (cache/write-message filename data authorization)
+                                      {:status 200
+                                       :headers {"Content-Type" "text/html"
+                                                 "Access-Control-Allow-Origin" "*"}
+                                       :body ""})
+                    "createRoom" (do
+                                   (cache/create-room filename data)
+                                   {:status 201
+                                    :headers {"Content-Type" "text/html"
+                                              "Access-Control-Allow-Origin" "*"}
+                                    :body ""})
+                    {:status 422
+                     :headers {"Content-Type" "text/html"}}))
                 {:status 422
-                 :headers {"Content-Type" "text/html"}}))
-            {:status 422
-             :headers {"Content-Type" "text/html"}})))
-      {:status 403
-       :headers {"Content-Type" "text/html"}})))
+                 :headers {"Content-Type" "text/html"}})))
+          {:status 403
+           :headers {"Content-Type" "text/html"}})))))
 
 (comment
   (reset! auth {})
