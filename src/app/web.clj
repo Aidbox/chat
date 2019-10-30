@@ -113,6 +113,12 @@
                                     :headers {"Content-Type" "text/html"
                                               "Access-Control-Allow-Origin" "*"}
                                     :body ""})
+                    "updateRoom" (do
+                                   (cache/update-room filename data)
+                                   {:status 202
+                                    :headers {"Content-Type" "text/html"
+                                              "Access-Control-Allow-Origin" "*"}
+                                    :body ""})
                     {:status 422
                      :headers {"Content-Type" "text/html"}}))
                 {:status 422

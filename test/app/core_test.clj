@@ -105,5 +105,19 @@
     (let [{:keys [status body]} (utils/read test-room)
           chat (first (json/parse-string (slurp body) keyword))]
       (is (= status 200))
-      (is (= (get-in chat [:users :test-client :viewed]) 103)))
+      (is (= (get-in chat [:users :test-client :viewed]) 103))))
+  (testing "update room info"
+    (let [room-name "room-info-test"]
+      (utils/create-room room-name {:meta :data})
+      (matcho/match (utils/insert room-name {:text "hello"}) {:status 200})
+      (matcho/match (utils/insert room-name {:text "hello"}) {:status 200})
+      (let [{:keys [status body]} (utils/read room-name {:viewed 2})
+            chat (first (json/parse-string (slurp body) keyword))]
+        (is (= status 200))
+        (matcho/match chat  {:meta "data" :users {:test-client {:viewed 2}}}))
+      (utils/update-room room-name {:meta :foo :bar :baz})
+      (let [{:keys [status body]} (utils/read room-name {})
+            chat (first (json/parse-string (slurp body) keyword))]
+        (is (= status 200))
+        (matcho/match chat  {:meta "foo" :bar "baz" :users {:test-client {:viewed 2}}})))
     ))

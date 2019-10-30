@@ -84,6 +84,11 @@
          :writer (io/writer file :append true)
          :reader (io/input-stream file)}))))
 
+(defn update-room-info [filename room-data]
+  (let [base-filename (str "./data/" filename)
+        info-file (io/file (str base-filename ".info"))]
+      (spit info-file (json/generate-string room-data))))
+
 (defn read-chunk [^java.io.InputStream stream max-length line-index start-offset stop-offset & [extra-skip]]
   (.mark stream (+ 1 max-length))
   (let [start-binary-offset (get line-index start-offset)

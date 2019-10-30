@@ -22,6 +22,17 @@
 (defn create-room [filename room-data]
   (swap! topics #(assoc % filename (persist/init-config filename room-data))))
 
+(defn update-room [filename room-data]
+  (let [file (get (get-file-config filename) :file)]
+    (locking file
+      (let [file-config (get-file-config filename)
+            ;; if we was locked,
+            ;; cache could be changed
+            ;; we need to reload cache
+            room-data (merge (:room-data file-config) room-data) ;; keep chat useruser information
+            ]
+        (persist/update-room-info filename room-data)
+        (swap! topics #(assoc-in % [filename :room-data] room-data))))))
 
 (def chat-push-notification (get (System/getenv) "CHAT_PUSH_NOTIFICATION"))
 

@@ -18,6 +18,10 @@
   @(httpkit/post (str "http://localhost:8080/" room)
                  {:body (json/generate-string {:action "createRoom" :data (into {} meatadata)})}))
 
+(defn update-room [room & [meatadata]]
+  @(httpkit/post (str "http://localhost:8080/" room)
+                 {:body (json/generate-string {:action "updateRoom" :data (into {} meatadata)})}))
+
 (defn insert [room message]
   @(httpkit/post (str "http://localhost:8080/" room)
                  {:body (json/generate-string {:action "createMessage" :data message})}))
