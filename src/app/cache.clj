@@ -67,6 +67,23 @@
     (when (count offline-users)
       (send-notification chat-name offline-users message authorization))))
 
+(defn get-persist-data [users]
+  (->> users
+       (map (fn [[id data]] [id (select-keys data [:viewed])]))
+       (into {})))
+
+(defn update-user-viewed [filename userId viewed]
+  (let [old-room-data (get-in @topics [filename :room-data])
+        old (get-persist-data (get-in @topics [filename :room-data :users]))
+        new (get-persist-data (get-in
+                               (swap! topics
+                                      update-in [filename :room-data :users userId]
+                                      assoc :viewed viewed
+                                      :last-active (time/now))
+                               [filename :room-data :users]))]
+    (when (not= old new)
+      (assoc old-room-data :users new))))
+
 (defn write-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
     (locking file
@@ -77,8 +94,9 @@
             userId (keyword (get-in message [:author :id]))
             in-chat (get-in file-config [:room-data :users userId])]
         (if in-chat
-          (let [message (assoc message
-                               :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
+          (let [message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
+                message (assoc message
+                               :message-index message-index
                                :timestamp (str (time/now)))
                 writed (persist/write-data-stream file-config message)
                 {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
@@ -88,13 +106,11 @@
                                 {:lines-count (+ 1 lines-count)
                                  :length (+ writed length)
                                  :last-index (or (second new-index) last-index)
-                                 :line-index (into line-index new-index)}))
+                                 :line-index (into line-index new-index)})
+            (let [persist-room-data (update-user-viewed filename userId message-index)]
+              (when persist-room-data
+                (persist/write-room-data file-config persist-room-data))))
           (throw (Exception. "User isn't in chat while writing")))))))
-
-(defn get-persist-data [users]
-  (->> users
-       (map (fn [[id data]] [id (select-keys data [:viewed])]))
-       (into {})))
 
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])
