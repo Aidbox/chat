@@ -115,9 +115,20 @@
             chat (first (json/parse-string (slurp body) keyword))]
         (is (= status 200))
         (matcho/match chat  {:meta "data" :users {:test-client {:viewed 2}}}))
-      (utils/update-room room-name {:meta :foo :bar :baz})
+      (utils/update-room room-name {:room-data {:meta :foo :bar :baz}})
       (let [{:keys [status body]} (utils/read room-name {})
             chat (first (json/parse-string (slurp body) keyword))]
         (is (= status 200))
-        (matcho/match chat  {:meta "foo" :bar "baz" :users {:test-client {:viewed 2}}})))
-    ))
+        (matcho/match chat  {:meta "foo" :bar "baz" :users {:test-client {:viewed 2}}}))
+      (utils/update-room room-name {:room-data {:empty :data} :new-users {:superadmin {:viewed 0}}})
+      (let [{:keys [status body]} (utils/read room-name {})
+            chat (first (json/parse-string (slurp body) keyword))]
+        (is (= status 200))
+        (matcho/match chat  {:empty "data" :users {:test-client {:viewed 2}
+                                                   :superadmin {:viewed 0}}}))
+
+      (utils/update-room room-name {:room-data {:data :empty} :remove-users ["test-client"]})
+      (let [{:keys [status body]} (utils/read room-name {})
+            chat (first (json/parse-string (slurp body) keyword))]
+        (is (= status 200))
+        (matcho/match chat  {:data "empty" :users {:superadmin {:viewed 0}}})))))
