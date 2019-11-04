@@ -35,7 +35,7 @@
                           :room-data
                           (merge data)
                           (update :users merge add-users)
-                          (update :users #(apply dissoc % remove-users)))
+                          (update :users #(apply dissoc % (map keyword remove-users))))
             room-data (merge (:room-data file-config) room-data) ;; keep chat useruser information
             ]
         (persist/update-room-info filename room-data)

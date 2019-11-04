@@ -8,11 +8,11 @@
 
 (defn clear-data []
   (->> "./data"
-      io/file
-      file-seq
-      (drop 1)
-      (map io/delete-file)
-      doall))
+       io/file
+       file-seq
+       (drop 1)
+       (map io/delete-file)
+       doall))
 
 (defn create-room [room & [meatadata]]
   @(httpkit/post (str "http://localhost:8080/" room)
@@ -26,10 +26,10 @@
   @(httpkit/post (str "http://localhost:8080/" room)
                  {:body (json/generate-string {:action "createMessage" :data (assoc message :author {:id "test-client"})})}))
 
-(defn read [room & [params]]
+(defn read [room & [params userId]]
   @(httpkit/post "http://localhost:8080/"
                  {:body (json/generate-string
-                         {:userId "test-client"
+                         {:userId (or userId "test-client")
                           :chats [(into {:id room} params)]})}))
 (defn insert-n [n]
   (doall

@@ -138,7 +138,8 @@
                                                    :superadmin {:viewed 0}}}))
 
       (utils/update-room room-name {:room-data {:data :empty} :remove-users ["test-client"]})
-      (let [{:keys [status body]} (utils/read room-name {})
+      (let [{:keys [status body]} (utils/read room-name {} "superadmin")
             chat (first (json/parse-string (slurp body) keyword))]
         (is (= status 200))
+        (is (nil? (get-in chat [:users :test-client])))
         (matcho/match chat  {:data "empty" :users {:superadmin {:viewed 0}}})))))
