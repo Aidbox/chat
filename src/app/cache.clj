@@ -70,9 +70,10 @@
 (defn write-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
     (locking file
-      (let [file-config (get-file-config filename) ;; if we was locked,
-                                                   ;; cache could be changed
-                                                   ;; we need to reload cache
+      (let [;; if we was locked,
+            ;; cache could be changed
+            ;; we need to reload cache
+            file-config (get-file-config filename)
             message (assoc message
                            :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
                            :timestamp (str (time/now)))
@@ -107,7 +108,11 @@
 (defn read-messages [filename {:keys [userId offset history viewed typing]}]
   (let [file-config (get-file-config filename)]
     (locking (:file file-config)
-      (let [persist-room-data (update-user-info filename userId viewed typing)]
+      (let [;; if we was locked,
+            ;; cache could be changed
+            ;; we need to reload cache
+            file-config (get-file-config filename)
+            persist-room-data (update-user-info filename userId viewed typing)]
         (when persist-room-data
           (persist/write-room-data file-config persist-room-data))
         (assoc
