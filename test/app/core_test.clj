@@ -52,10 +52,13 @@
 
   (testing "Create many message"
     (doall (for [i (range 0 100)]
-              (matcho/match (utils/insert test-room {:text "hello"}) {:status 200}))))
+             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+                 ;; We have to warm up buffer to fix init issues
+                 ;; if we remove read here test will fail
+                 (matcho/match (utils/read test-room) {:status 200})))))
 
   (testing "Read initial from big chat"
-    (parse-messages (:body (utils/read test-room))) ;; TODO warmup buffer to fix init issues
+    (parse-messages (:body (utils/read test-room)))
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)]
       (is (= status 200))
