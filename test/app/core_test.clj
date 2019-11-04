@@ -17,6 +17,9 @@
   (utils/create-room test-room)
   )
 
+(defn parse-chat [body]
+  (first (json/parse-string (slurp body) keyword)))
+
 (defn parse-messages [body]
   (let [chat (first (json/parse-string (slurp body) keyword))
         messages (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))]
@@ -29,7 +32,11 @@
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
-    (matcho/match (utils/insert test-room {:text "hello"}) {:status 200}))
+    (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
+    (let [{:keys [status body]} (utils/read test-room)
+          chat (parse-chat body)]
+      (is (= status 200))
+      (matcho/match chat {:users {:test-client {:viewed 5}}})))
 
   (testing "Read initial"
     (let [{:keys [status body]} (utils/read test-room)
