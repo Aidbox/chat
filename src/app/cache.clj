@@ -22,13 +22,20 @@
 (defn create-room [filename room-data]
   (swap! topics #(assoc % filename (persist/init-config filename room-data))))
 
-(defn update-room [filename room-data]
+(defn update-room [filename room]
   (let [file (get (get-file-config filename) :file)]
     (locking file
-      (let [file-config (get-file-config filename)
-            ;; if we was locked,
+      (let [;; if we was locked,
             ;; cache could be changed
             ;; we need to reload cache
+            file-config (get-file-config filename)
+            {data :room-data add-users :new-users remove-users :remove-users} room
+            dissoc-list #(apply dissoc )
+            room-data (-> file-config
+                          :room-data
+                          (merge data)
+                          (update :users merge add-users)
+                          (update :users #(apply dissoc % remove-users)))
             room-data (merge (:room-data file-config) room-data) ;; keep chat useruser information
             ]
         (persist/update-room-info filename room-data)

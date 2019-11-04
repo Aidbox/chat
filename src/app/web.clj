@@ -115,7 +115,7 @@
                                     :body ""})
                     "updateRoom" (do
                                    (cache/update-room filename data)
-                                   {:status 202
+                                   {:status 200
                                     :headers {"Content-Type" "text/html"
                                               "Access-Control-Allow-Origin" "*"}
                                     :body ""})
