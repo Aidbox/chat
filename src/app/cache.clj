@@ -74,18 +74,22 @@
             ;; cache could be changed
             ;; we need to reload cache
             file-config (get-file-config filename)
-            message (assoc message
-                           :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
-                           :timestamp (str (time/now)))
-            writed (persist/write-data-stream file-config message)
-            {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
-            new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
-        (notify-offline-users filename file-config message authorization)
-        (update-cache-index filename
-                            {:lines-count (+ 1 lines-count)
-                             :length (+ writed length)
-                             :last-index (or (second new-index) last-index)
-                             :line-index (into line-index new-index)})))))
+            userId (keyword (get-in message [:author :id]))
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (let [message (assoc message
+                               :message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
+                               :timestamp (str (time/now)))
+                writed (persist/write-data-stream file-config message)
+                {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
+                new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
+            (notify-offline-users filename file-config message authorization)
+            (update-cache-index filename
+                                {:lines-count (+ 1 lines-count)
+                                 :length (+ writed length)
+                                 :last-index (or (second new-index) last-index)
+                                 :line-index (into line-index new-index)}))
+          (throw (Exception. "User isn't in chat while writing")))))))
 
 (defn get-persist-data [users]
   (->> users
@@ -112,12 +116,15 @@
             ;; cache could be changed
             ;; we need to reload cache
             file-config (get-file-config filename)
-            persist-room-data (update-user-info filename userId viewed typing)]
-        (when persist-room-data
-          (persist/write-room-data file-config persist-room-data))
-        (assoc
-         (get-in @topics [filename :room-data])
-         :messages (persist/read-stream file-config offset history))))))
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (let [persist-room-data (update-user-info filename userId viewed typing)]
+            (when persist-room-data
+              (persist/write-room-data file-config persist-room-data))
+            (assoc
+             (get-in @topics [filename :room-data])
+             :messages (persist/read-stream file-config offset history)))
+          (throw (Exception. "User is not in chat while reading")))))))
 
 (comment
   (get-in @topics ["test-room" :room-data])
