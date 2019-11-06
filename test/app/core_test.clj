@@ -27,6 +27,8 @@
 
 (deftest send-and-read
   (setup)
+  (testing "Options request"
+    (matcho/match @(httpkit/options "http://localhost:8080/fooo") {:status 200}))
   (testing "Create message"
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
