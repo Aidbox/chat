@@ -18,10 +18,10 @@
   )
 
 (defn parse-chat [body]
-  (first (json/parse-string (slurp body) keyword)))
+  (first (json/parse-string body keyword)))
 
 (defn parse-messages [body]
-  (let [chat (first (json/parse-string (slurp body) keyword))
+  (let [chat (first (json/parse-string body keyword))
         messages (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))]
     messages))
 
@@ -110,12 +110,12 @@
 
   (testing "Viewed"
     (let [{:keys [status body]} (utils/read test-room {:offset 103, :viewed 103})
-          chat (first (json/parse-string (slurp body) keyword))]
+          chat (first (json/parse-string body keyword))]
       (is (= status 200))
       (is (= (get-in chat [:users :test-client :viewed]) 103)))
     (sut/restart)
     (let [{:keys [status body]} (utils/read test-room)
-          chat (first (json/parse-string (slurp body) keyword))]
+          chat (first (json/parse-string body keyword))]
       (is (= status 200))
       (is (= (get-in chat [:users :test-client :viewed]) 103))))
   (testing "update room info"
@@ -124,24 +124,24 @@
       (matcho/match (utils/insert room-name {:text "hello"}) {:status 200})
       (matcho/match (utils/insert room-name {:text "hello"}) {:status 200})
       (let [{:keys [status body]} (utils/read room-name {:viewed 2})
-            chat (first (json/parse-string (slurp body) keyword))]
+            chat (first (json/parse-string body keyword))]
         (is (= status 200))
         (matcho/match chat  {:meta "data" :users {:test-client {:viewed 2}}}))
       (utils/update-room room-name {:room-data {:meta :foo :bar :baz}})
       (let [{:keys [status body]} (utils/read room-name {})
-            chat (first (json/parse-string (slurp body) keyword))]
+            chat (first (json/parse-string body keyword))]
         (is (= status 200))
         (matcho/match chat  {:meta "foo" :bar "baz" :users {:test-client {:viewed 2}}}))
       (utils/update-room room-name {:room-data {:empty :data} :new-users {:superadmin {:viewed 0}}})
       (let [{:keys [status body]} (utils/read room-name {})
-            chat (first (json/parse-string (slurp body) keyword))]
+            chat (first (json/parse-string body keyword))]
         (is (= status 200))
         (matcho/match chat  {:empty "data" :users {:test-client {:viewed 2}
                                                    :superadmin {:viewed 0}}}))
 
       (utils/update-room room-name {:room-data {:data :empty} :remove-users ["test-client"]})
       (let [{:keys [status body]} (utils/read room-name {} "superadmin")
-            chat (first (json/parse-string (slurp body) keyword))]
+            chat (first (json/parse-string body keyword))]
         (is (= status 200))
         (is (nil? (get-in chat [:users :test-client])))
         (matcho/match chat  {:data "empty" :users {:superadmin {:viewed 0}}})))))

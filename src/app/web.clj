@@ -20,12 +20,22 @@
          (into {}))
     {}))
 
+(def response-headers {"Access-Control-Allow-Headers" "*"
+                       "Access-Control-Allow-Methods" "*"
+                       "Access-Control-Allow-Origin" "*"
+                       "Access-Control-Allow-Credentials" "*"
+                       "Access-Control-Expose-Headers" "*"
+                       "Content-Type" "application/json"
+              })
+
 (defn index []
   {:status 200
+   :headers (assoc response-headers "Content-Type" "text/html")
    :body (slurp "./resources/html/index.html")})
 
 (defn batch-operation [{:keys [userId chats]}]
   {:status 200
+   :headers response-headers
    :body (json/generate-string
           (map (fn [{id :id :as meta}]
                  (assoc (cache/read-messages id (assoc meta :userId (keyword userId)))
@@ -90,9 +100,8 @@
   (let [{uri :uri action :request-method headers :headers} req]
     (if (= action :options)
       {:status 200
-       :headers {"Content-Type" "text/html"
-                 "Access-Control-Allow-Origin" "*"}
-       :body ""}
+       :headers response-headers
+       :body {}}
       (if (and (= uri "/")
                (= action :get))
         (index)
@@ -109,27 +118,24 @@
                       "createMessage" (do
                                         (cache/write-message filename data authorization)
                                         {:status 200
-                                         :headers {"Content-Type" "text/html"
-                                                   "Access-Control-Allow-Origin" "*"}
-                                         :body ""})
+                                         :headers response-headers
+                                         :body {}})
                       "createRoom" (do
                                      (cache/create-room filename data)
                                      {:status 201
-                                      :headers {"Content-Type" "text/html"
-                                                "Access-Control-Allow-Origin" "*"}
-                                      :body ""})
+                                      :headers response-headers
+                                      :body {}})
                       "updateRoom" (do
                                      (cache/update-room filename data)
                                      {:status 200
-                                      :headers {"Content-Type" "text/html"
-                                                "Access-Control-Allow-Origin" "*"}
-                                      :body ""})
+                                      :headers response-headers
+                                      :body {}})
                       {:status 422
-                       :headers {"Content-Type" "text/html"}}))
+                       :headers response-headers}))
                   {:status 422
-                   :headers {"Content-Type" "text/html"}})))
+                   :headers response-headers})))
             {:status 403
-             :headers {"Content-Type" "text/html"}}))))))
+             :headers response-headers}))))))
 
 (comment
   (reset! auth {})
