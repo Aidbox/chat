@@ -84,6 +84,25 @@
     (when (not= old new)
       (assoc old-room-data :users new))))
 
+(defn raw-write-message [filename userId message authorization]
+  (let [file-config (get-file-config filename)
+        message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
+        message (assoc message
+                       :message-index message-index
+                       :timestamp (str (time/now)))
+        writed (persist/write-data-stream file-config message)
+        {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
+        new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
+    (notify-offline-users filename file-config message authorization)
+    (update-cache-index filename
+                        {:lines-count (+ 1 lines-count)
+                         :length (+ writed length)
+                         :last-index (or (second new-index) last-index)
+                         :line-index (into line-index new-index)})
+    (let [persist-room-data (update-user-viewed filename userId message-index)]
+      (when persist-room-data
+        (persist/write-room-data file-config persist-room-data)))))
+
 (defn write-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
     (locking file
@@ -94,26 +113,23 @@
             userId (keyword (get-in message [:author :id]))
             in-chat (get-in file-config [:room-data :users userId])]
         (if in-chat
-          (let [message-index (+ 1 (get-in file-config [:index-cache :lines-count]))
-                message (assoc message
-                               :message-index message-index
-                               :timestamp (str (time/now)))
-                writed (persist/write-data-stream file-config message)
-                {:keys [lines-count length line-index last-index]} (get file-config :index-cache)
-                new-index (persist/write-index-stream file-config (+ lines-count 1) length)]
-            (notify-offline-users filename file-config message authorization)
-            (update-cache-index filename
-                                {:lines-count (+ 1 lines-count)
-                                 :length (+ writed length)
-                                 :last-index (or (second new-index) last-index)
-                                 :line-index (into line-index new-index)})
-            (let [persist-room-data (update-user-viewed filename userId message-index)]
-              (when persist-room-data
-                (persist/write-room-data file-config persist-room-data))))
+          (raw-write-message filename userId message authorization)
           (throw (Exception. "User isn't in chat while writing")))))))
 
 (defn delete-message [filename message authorization]
-  (write-message filename message authorization))
+  (let [file (get (get-file-config filename) :file)]
+    (locking file
+      (let [;; if we was locked,
+            ;; cache could be changed
+            ;; we need to reload cache
+            file-config (get-file-config filename)
+            userId (keyword (get-in message [:author :id]))
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (raw-write-message filename userId message authorization)
+          ;; TODO perform delete on the persistent layer
+          #_(delete-message filename (:delete-index message))
+          (throw (Exception. "User isn't in chat while writing")))))))
 
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])

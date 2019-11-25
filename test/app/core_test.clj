@@ -154,6 +154,7 @@
       (is (= status 200))
       (let [target (first (filter #(= (:message-index %) 101) lines))
             action (first (filter #(= (:message-index %) 106) lines))]
+        ;; TODO uncomment after delete will be implemented on the persistent layer
         ;; (is (nil? target))
         (is (not (nil? action)))
         ))))
