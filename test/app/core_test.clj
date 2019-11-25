@@ -32,8 +32,10 @@
   (testing "Create message"
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
+    (sut/restart)
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
+    (sut/restart)
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (let [{:keys [status body]} (utils/read test-room)
           chat (parse-chat body)]
@@ -144,4 +146,14 @@
             chat (first (json/parse-string body keyword))]
         (is (= status 200))
         (is (nil? (get-in chat [:users :test-client])))
-        (matcho/match chat  {:data "empty" :users {:superadmin {:viewed 0}}})))))
+        (matcho/match chat  {:data "empty" :users {:superadmin {:viewed 0}}}))))
+  (testing "delete message"
+    (matcho/match (utils/delete test-room 101) {:status 200})
+    (let [{:keys [status body]} (utils/read test-room {:offset 99})
+          lines (parse-messages body)]
+      (is (= status 200))
+      (let [target (first (filter #(= (:message-index %) 101) lines))
+            action (first (filter #(= (:message-index %) 106) lines))]
+        ;; (is (nil? target))
+        (is (not (nil? action)))
+        ))))

@@ -115,6 +115,11 @@
                   (let [{:keys [action data]} (:body req)
                         [_ filename](str/split uri #"/")]
                     (case action
+                      "deleteMessage" (do
+                                        (cache/delete-message filename data authorization)
+                                        {:status 200
+                                         :headers response-headers
+                                         :body {}})
                       "createMessage" (do
                                         (cache/write-message filename data authorization)
                                         {:status 200

@@ -112,6 +112,9 @@
                 (persist/write-room-data file-config persist-room-data))))
           (throw (Exception. "User isn't in chat while writing")))))))
 
+(defn delete-message [filename message authorization]
+  (write-message filename message authorization))
+
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])
         old (get-persist-data (get-in @topics [filename :room-data :users]))

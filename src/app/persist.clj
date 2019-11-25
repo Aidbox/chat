@@ -33,8 +33,9 @@
                              (Integer/parseInt v)]))
                      (into [[0 0]])))
         [last-index last-offset] (last pairs)
-        line-index (into {} pairs)]
-    {:lines-count (+ last-index (count-extra-lines file last-offset))
+        line-index (into {} pairs)
+        lines-count (+ last-index (count-extra-lines file last-offset))]
+    {:lines-count (if (= last-index 0) lines-count (- lines-count 1))
      :length (with-open [reader (io/input-stream file)]
                (.available reader))
      :last-index last-index
