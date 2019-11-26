@@ -58,6 +58,7 @@
             [_ filename](str/split uri #"/")]
         (case action
           "createMessage" (set [filename])
+          "deleteMessage" (set [filename])
           false)))))
 
 
