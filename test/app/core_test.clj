@@ -22,7 +22,7 @@
 
 (defn parse-messages [body]
   (let [chat (first (json/parse-string body keyword))
-        messages (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))]
+        messages (doall (filter identity (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))))]
     messages))
 
 (deftest send-and-read
@@ -157,4 +157,14 @@
         ;; TODO uncomment after delete will be implemented on the persistent layer
         ;; (is (nil? target))
         (is (not (nil? action)))
-        ))))
+        )))
+  (testing "199 offset edge case"
+    (doall (for [i (range 0 93)]
+             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+                 ;; We have to warm up buffer to fix init issues
+                 ;; if we remove read here test will fail
+                 (matcho/match (utils/read test-room) {:status 200}))))
+    (let [{:keys [status body]} (utils/read test-room {:offset 199})
+          lines (parse-messages body)]
+      (is (= status 200))
+      (is (= (count lines) 0)))))
