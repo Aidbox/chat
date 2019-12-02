@@ -93,15 +93,18 @@
 (defn read-chunk [^java.io.InputStream stream max-length line-index start-offset stop-offset & [extra-skip]]
   (.mark stream (+ 1 max-length))
   (let [start-binary-offset (get line-index start-offset)
-        stop-binary-offset (get line-index stop-offset max-length)
-        length (- stop-binary-offset start-binary-offset)
-        out-stream (java.io.StringWriter.)
-        bytes (byte-array (min length max-length))]
-    (.skip stream start-binary-offset)
-    (.read stream bytes)
-    (io/copy bytes out-stream)
-    (.reset stream)
-    (str/join "\n" (drop (or extra-skip 0) (str/split (.toString out-stream) #"\n")))))
+        stop-binary-offset (get line-index stop-offset max-length)]
+    (if (and (not (nil? stop-binary-offset)) (not (nil? start-binary-offset)))
+      (let [
+            length (- stop-binary-offset start-binary-offset)
+            out-stream (java.io.StringWriter.)
+            bytes (byte-array (min length max-length))]
+        (.skip stream start-binary-offset)
+        (.read stream bytes)
+        (io/copy bytes out-stream)
+        (.reset stream)
+        (str/join "\n" (drop (or extra-skip 0) (str/split (.toString out-stream) #"\n"))))
+      "")))
 
 (defn read-history [^java.io.InputStream stream max-length line-index history-index]
   (read-chunk stream max-length line-index (- history-index index-step) history-index))
