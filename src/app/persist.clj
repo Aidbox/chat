@@ -35,7 +35,6 @@
         line-index (into {} pairs)
         lines-count (count-lines file)
         ]
-    (println lines-count)
     {:lines-count lines-count
      :length (with-open [reader (io/input-stream file)]
                (.available reader))

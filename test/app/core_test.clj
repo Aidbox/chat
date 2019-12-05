@@ -177,8 +177,7 @@
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)]
       (is (= status 200))
-      (is (= (count lines) 15))
-      (println lines))
+      (is (= (count lines) 15)))
     (sut/restart)
     (matcho/match (utils/insert test-room {:text "message after reload"}) {:status 200})
     (doall (for [_ (range 0 100)]
@@ -188,5 +187,4 @@
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)]
       (is (= status 200))
-      (is (= (count lines) 16))
-      (println lines))))
+      (is (= (count lines) 16)))))
