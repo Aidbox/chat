@@ -167,4 +167,26 @@
     (let [{:keys [status body]} (utils/read test-room {:offset 199})
           lines (parse-messages body)]
       (is (= status 200))
-      (is (= (count lines) 0)))))
+      (is (= (count lines) 0))))
+  (testing "extra offset anfter reload"
+    (doall (for [i (range 0 15)]
+             (do (matcho/match (utils/insert test-room {:text (str "hello 12345678 " i)}) {:status 200})
+                 ;; We have to warm up buffer to fix init issues
+                 ;; if we remove read here test will fail
+                 (matcho/match (utils/read test-room) {:status 200}))))
+    (let [{:keys [status body]} (utils/read test-room)
+          lines (parse-messages body)]
+      (is (= status 200))
+      (is (= (count lines) 15))
+      (println lines))
+    (sut/restart)
+    (matcho/match (utils/insert test-room {:text "message after reload"}) {:status 200})
+    (doall (for [_ (range 0 100)]
+          ;; We have to warm up buffer to fix init issues
+          ;; if we remove read here test will fail
+          (utils/read test-room)))
+    (let [{:keys [status body]} (utils/read test-room)
+          lines (parse-messages body)]
+      (is (= status 200))
+      (is (= (count lines) 16))
+      (println lines))))

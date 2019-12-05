@@ -10,9 +10,8 @@
 
 (def index-step 100)
 
-(defn count-extra-lines [file offset]
+(defn count-lines [file]
   (with-open [stream (io/reader file)]
-    (.skip stream offset)
     (loop [start 0]
       (let [cur-char (.read stream)]
         (if (not= cur-char -1)
@@ -34,8 +33,10 @@
                      (into [[0 0]])))
         [last-index last-offset] (last pairs)
         line-index (into {} pairs)
-        lines-count (+ last-index (count-extra-lines file last-offset))]
-    {:lines-count (if (= last-index 0) lines-count (- lines-count 1))
+        lines-count (count-lines file)
+        ]
+    (println lines-count)
+    {:lines-count lines-count
      :length (with-open [reader (io/input-stream file)]
                (.available reader))
      :last-index last-index
@@ -142,3 +143,20 @@
 
 (defn write-room-data [{:keys [info-file]} room-data]
   (spit info-file (json/generate-string room-data)))
+
+(comment
+  (let [filename "903d30ed-8034-4788-bf6c-c368e5691667"
+        base-filename (str "./data/" filename)
+        file (io/file (str base-filename ".data"))
+        bytes (byte-array 1000)
+        out-stream (java.io.StringWriter.)
+        ]
+    (with-open [stream (io/input-stream file)]
+      (.skip stream 81370)
+      (.read stream bytes)
+      (io/copy bytes out-stream)
+      (.toString out-stream)
+      ))
+
+
+  )
