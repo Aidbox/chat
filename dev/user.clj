@@ -11,5 +11,4 @@
                                   "cider.nrepl/cider-middleware"]}))
 
 (defn -main [& args]
-  (start-nrepl)
-  (app/-main))
+  (start-nrepl))

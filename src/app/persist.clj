@@ -143,7 +143,30 @@
 (defn write-room-data [{:keys [info-file]} room-data]
   (spit info-file (json/generate-string room-data)))
 
+(defn check-index[]
+  (doseq [file (->> (clojure.java.io/file "./data")
+                    file-seq
+                    (filter #(not (.isDirectory %)))
+                    (filter #(str/ends-with? (.getName %) ".data")))]
+    (let [data (map json/parse-string (filter identity (str/split (slurp file) #"\n")))]
+      (when (> (count data) 1)
+        (let [[correct] (reduce (fn [[correct index] item]
+                                  (let [message-index (get item "message-index")]
+                                    (if (= index -1)
+                                     [false -1]
+                                     (if (> message-index index)
+                                       [true message-index]
+                                       [false -1]
+                                       ))))
+                                [true 0]
+                                data
+                                )]
+          (if (not correct)
+            (println "Wrong indexing of " (.getName file))))))))
+
 (comment
+  (check-index)
+  
   (let [filename "903d30ed-8034-4788-bf6c-c368e5691667"
         base-filename (str "./data/" filename)
         file (io/file (str base-filename ".data"))
