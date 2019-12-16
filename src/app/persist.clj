@@ -1,6 +1,8 @@
 (ns app.persist
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [clj-time.core :as time]
+            [clj-time.format :as format-time]
             [cheshire.core :as json])
   (:import java.io.File
            java.io.InputStream
@@ -56,10 +58,14 @@
                            :line-index {0 0}})
             index-writer (io/writer index-file :append true)
             writer (io/writer file :append true)
-            reader (io/input-stream file)]
+            reader (io/input-stream file)
+            room-data (json/parse-string (slurp info-file) keyword)
+            room-data (update room-data :users (fn [x] (into {}
+                                                             (map (fn [[k v]]
+                                                                    [k (update v :last-active format-time/parse)]) x))))]
         {:file file
          :info-file info-file
-         :room-data (json/parse-string (slurp info-file) keyword)
+         :room-data room-data
          :index-cache index-cache
          :index-writer index-writer
          :writer writer
@@ -180,5 +186,16 @@
       (.toString out-stream)
       ))
 
+  (let [room-data {:users
+                   {
+                    :e323e5e6-37ef-43a8-be27-35c517ebb8f9 {:viewed 142}
+                    :7e35408a-dd49-40ec-8a25-a504aae8d5b0 {:viewed 154 :typing false, :last-active "2019-12-16T06:15:39.165Z"}
+                    :ac44242f-143a-4f8d-b512-839dc8f6cb7b {:viewed nil}
+                    :a9912cfc-4efe-4af6-930a-973af6d5f46d {:viewed 111, :typing false, :last-active "2019-12-12T05:29:25.022Z"}}}]
+    (update room-data :users (fn [x] (into {}
+                                           (map (fn [[k v]]
+                                                    [k (update v :last-active format-time/parse)]) x)))))
+
+  (format-time/parse (get (json/parse-string (json/generate-string {:now (time/now)})) "now"))
 
   )

@@ -60,10 +60,14 @@
         offline-users (filter
                        (complement nil?)
                        (for [[id {:keys [viewed last-active]}] (get-in file-config [:room-data :users])]
-                         (if (nil? last-active)
-                           id
-                           (when (> (time/in-msecs (time/interval last-active now)) 2000)
-                             id))))]
+                         (try
+                           (if (nil? last-active)
+                             id
+                             (when (> (time/in-msecs (time/interval last-active now)) 2000)
+                               id))
+                           (catch Exception e
+                             (println e)
+                             ))))]
     (when (count offline-users)
       (send-notification chat-name offline-users message authorization))))
 
