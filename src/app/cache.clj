@@ -118,7 +118,7 @@
             in-chat (get-in file-config [:room-data :users userId])]
         (if in-chat
           (raw-write-message filename userId message authorization)
-          (throw (Exception. "User isn't in chat while writing")))))))
+          (throw (Exception. (str "User isn't in chat " filename " while writing"))))))))
 
 (defn delete-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
@@ -133,7 +133,7 @@
           (raw-write-message filename userId message authorization)
           ;; TODO perform delete on the persistent layer
           #_(delete-message filename (:delete-index message))
-          (throw (Exception. "User isn't in chat while writing")))))))
+          (throw (Exception. (str "User isn't in chat " filename " while deleting"))))))))
 
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])
@@ -163,7 +163,7 @@
             (assoc
              (get-in @topics [filename :room-data])
              :messages (persist/read-stream file-config offset history)))
-          (throw (Exception. "User is not in chat while reading")))))))
+          (throw (Exception. (str "User is not in chat " filename " while reading"))))))))
 
 (comment
   (get-in @topics ["test-room" :room-data])

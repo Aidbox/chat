@@ -12,21 +12,17 @@
   (to-json [dt gen]
     (json-proto/write-string gen (str dt))))
 
-(defn parse-quesrystring [qs]
-  (if qs
-    (->> (str/split qs #"&")
-         (map #(str/split % #"="))
-         (map (fn [[k v]] [(keyword k) v]))
-         (into {}))
-    {}))
-
 (def response-headers {"Access-Control-Allow-Headers" "*"
                        "Access-Control-Allow-Methods" "*"
                        "Access-Control-Allow-Origin" "*"
                        "Access-Control-Allow-Credentials" "*"
                        "Access-Control-Expose-Headers" "*"
-                       "Content-Type" "application/json"
-              })
+                       "Content-Type" "application/json"})
+
+(defn json-resp [status body]
+  {:status status
+   :headers response-headers
+   :body (json/generate-string body)})
 
 (defn index []
   {:status 200
@@ -34,13 +30,17 @@
    :body (slurp "./resources/html/index.html")})
 
 (defn batch-operation [{:keys [userId chats]}]
-  {:status 200
-   :headers response-headers
-   :body (json/generate-string
+  (json-resp 200
+        (remove nil?
           (map (fn [{id :id :as meta}]
-                 (assoc (cache/read-messages id (assoc meta :userId (keyword userId)))
-                        :id id))
-               chats))})
+                 (try
+                   (assoc
+                    (cache/read-messages id (assoc meta :userId (keyword userId)))
+                    :id id)
+                   (catch Exception e
+                     (println
+                      (str "Skipped exception while reading messages: " (.getMessage e))))))
+               chats))))
 
 (defonce auth (atom {}))
 
@@ -60,7 +60,6 @@
           "createMessage" (set [filename])
           "deleteMessage" (set [filename])
           false)))))
-
 
 (defn check-auth [authorization req]
   (if-let [auth-data (get @auth authorization)]
@@ -106,42 +105,37 @@
       (if (and (= uri "/")
                (= action :get))
         (index)
-        (let[req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
-             authorization (get (:headers req) "authorization")]
-          (if (is-authorized req)
-            (case uri
-              "/" (batch-operation (:body req))
-              (let [params (parse-quesrystring (:query-string req))]
-                (if (= action :post)
+        (try
+          (let [req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
+                authorization (get (:headers req) "authorization")]
+            (if (is-authorized req)
+              (if (= action :post)
+                (case uri
+                  "/" (batch-operation (:body req))
                   (let [{:keys [action data]} (:body req)
                         [_ filename](str/split uri #"/")]
                     (case action
                       "deleteMessage" (do
                                         (cache/delete-message filename data authorization)
-                                        {:status 200
-                                         :headers response-headers
-                                         :body {}})
+                                        (json-resp 200 {}))
                       "createMessage" (do
                                         (cache/write-message filename data authorization)
-                                        {:status 200
-                                         :headers response-headers
-                                         :body {}})
+                                        (json-resp 200 {}))
                       "createRoom" (do
                                      (cache/create-room filename data)
-                                     {:status 201
-                                      :headers response-headers
-                                      :body {}})
+                                     (json-resp 201 {}))
                       "updateRoom" (do
                                      (cache/update-room filename data)
-                                     {:status 200
-                                      :headers response-headers
-                                      :body {}})
-                      {:status 422
-                       :headers response-headers}))
-                  {:status 422
-                   :headers response-headers})))
-            {:status 403
-             :headers response-headers}))))))
+                                     (json-resp 200 {}))
+                      (json-resp 422 {:error "wrong_action"
+                                      :error_description "Unsupported action"}))))
+                (json-resp 422 {:error "wrong_method"
+                                :error_description "POST method required"}))
+              (json-resp 433 {:error "unauthorized"
+                              :error_description "Unauthorized request"})))
+          (catch Exception e
+            (json-resp 500 {:error "server_error"
+                            :error_description (.getMessage e)})))))))
 
 (comment
   (reset! auth {})
