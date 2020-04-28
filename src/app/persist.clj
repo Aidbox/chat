@@ -43,6 +43,11 @@
      :last-index last-index
      :line-index line-index}))
 
+(defn is-config-exists [filename]
+  (let [base-filename (str "./data/" filename)
+        info-file (io/file (str base-filename ".info"))]
+      (.exists info-file)))
+
 (defn load-config [filename]
   (let [base-filename (str "./data/" filename)
         info-file (io/file (str base-filename ".info"))]
