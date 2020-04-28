@@ -41,7 +41,9 @@
             new-room-data {:chat chat
                            :users (reduce
                                    (fn [acc [user-id user-info]]
-                                     (assoc acc user-id user-info))
+                                     (if (get acc user-id)
+                                       (assoc acc user-id user-info)
+                                       acc))
                                    users
                                    prev-users)}
             room-data (merge (:room-data file-config) new-room-data) ;; keep chat useruser information
