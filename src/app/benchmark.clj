@@ -14,13 +14,9 @@
        (map io/delete-file)
        doall))
 
-(defn create-room [room & [meatadata]]
+(defn sync-room [room & [metadata]]
   @(httpkit/post (str "http://localhost:8080/" room)
-                 {:body (json/generate-string {:action "createRoom" :data (into {:users {"test-client" {:viewed 0 :typing false}}} meatadata)})}))
-
-(defn update-room [room & [meatadata]]
-  @(httpkit/post (str "http://localhost:8080/" room)
-                 {:body (json/generate-string {:action "updateRoom" :data (into {} meatadata)})}))
+                 {:body (json/generate-string {:action "syncRoom" :data (into {:users {:test-client {:viewed 0 :typing false}}} metadata)})}))
 
 (defn insert [room message]
   @(httpkit/post (str "http://localhost:8080/" room)

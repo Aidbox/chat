@@ -5,7 +5,8 @@
             [org.httpkit.client :as httpkit-client]
             [org.httpkit.server :as httpkit]
             [cheshire.core :as json]
-            [cheshire.generate :as json-proto]))
+            [cheshire.generate :as json-proto]
+            [clj-time.core :as time]))
 
 (extend-protocol json-proto/JSONable
   org.joda.time.DateTime
@@ -38,14 +39,14 @@
                     (cache/read-messages id (assoc meta :userId (keyword userId)))
                     :id id)
                    (catch Exception e
-                     (println
-                      (str "Skipped exception while reading messages: " (.getMessage e))))))
+                     nil)))
                chats))))
 
 (defonce auth (atom {}))
 
 (def chat-secret (get (System/getenv) "CHAT_SECRET"))
 (def chat-auth-remote (get (System/getenv) "CHAT_AUTH_REMOTE"))
+(def chat-auth-cache-ttl (Integer/parseInt (get (System/getenv) "CHAT_AUTH_CACHE_TTL" "1")))
 
 (defn extract-chats [req]
   (let [{uri :uri action :request-method headers :headers} req]
@@ -62,24 +63,15 @@
           false)))))
 
 (defn check-auth [authorization req]
-  (if-let [auth-data (get @auth authorization)]
-    (let [chats (extract-chats req)]
-      (if (clojure_set/subset? chats auth-data)
-        true
-        (let [chats (extract-chats req)
-              body {:chats chats}
-              response @(httpkit-client/post
-                         chat-auth-remote
-                         {:headers {"authorization" authorization
-                                    "content-type" "application/json"}
-                          :method :post
-                          :body (json/generate-string body)})]
-          (if (= (:status response) 200)
-            (swap! auth assoc authorization chats)
-            false))))
-    (when (= (:uri req) "/")
-      (let [chats (extract-chats req)
-            body {:chats chats}
+  (let [chats (extract-chats req)
+        {auth-expires :expires
+         auth-chats :chats} (get @auth authorization
+                                 {:expires (time/now) :chats (set [])})]
+    (if (and
+         (time/after? auth-expires (time/now))
+         (clojure_set/subset? chats auth-chats))
+      true
+      (let [body {:chats chats}
             response @(httpkit-client/post
                        chat-auth-remote
                        {:headers {"authorization" authorization
@@ -87,7 +79,11 @@
                         :method :post
                         :body (json/generate-string body)})]
         (if (= (:status response) 200)
-          (swap! auth assoc authorization chats)
+          (swap! auth
+                 assoc
+                 authorization
+                 {:expires (time/plus (time/now) (time/minutes chat-auth-cache-ttl))
+                  :chats chats})
           false)))))
 
 (defn is-authorized [req]
@@ -121,17 +117,14 @@
                       "createMessage" (do
                                         (cache/write-message filename data authorization)
                                         (json-resp 200 {}))
-                      "createRoom" (do
-                                     (cache/create-room filename data)
-                                     (json-resp 201 {}))
-                      "updateRoom" (do
-                                     (cache/update-room filename data)
+                      "syncRoom" (do
+                                     (cache/sync-room filename data)
                                      (json-resp 200 {}))
                       (json-resp 422 {:error "wrong_action"
                                       :error_description "Unsupported action"}))))
                 (json-resp 422 {:error "wrong_method"
                                 :error_description "POST method required"}))
-              (json-resp 433 {:error "unauthorized"
+              (json-resp 403 {:error "unauthorized"
                               :error_description "Unauthorized request"})))
           (catch Exception e
             (json-resp 500 {:error "server_error"
