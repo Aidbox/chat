@@ -27,7 +27,8 @@
    (:participant chat)))
 
 (defn- create-room [filename {chat :chat}]
-  (swap! topics #(assoc % filename (persist/init-config filename {:chat chat :users (extract-users chat)}))))
+  (let [config (persist/init-config filename {:chat chat :users (extract-users chat)})]
+    (swap! topics #(assoc % filename config))))
 
 (defn- update-room [filename {chat :chat}]
   (let [file (get (get-file-config filename) :file)]
