@@ -133,8 +133,11 @@
             ;; cache could be changed
             ;; we need to reload cache
             file-config (get-file-config filename)
-            userId (keyword (get-in message [:author :id]))]
-        (raw-write-message filename userId message authorization)))))
+            userId (keyword (get-in message [:author :id]))
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (raw-write-message filename userId message authorization)
+          (throw (Exception. (str "User " userId " isn't in chat " filename " while writing"))))))))
 
 (defn delete-message [filename message authorization]
   (let [file (get (get-file-config filename) :file)]
@@ -143,11 +146,15 @@
             ;; cache could be changed
             ;; we need to reload cache
             file-config (get-file-config filename)
-            userId (keyword (get-in message [:author :id]))]
-        (raw-write-message filename userId message authorization)
-        ;; TODO perform delete on the persistent layer
-        #_(delete-message filename (:delete-index message))
-        ))))
+            userId (keyword (get-in message [:author :id]))
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (do
+            (raw-write-message filename userId message authorization)
+            ;; TODO perform delete on the persistent layer
+            #_(delete-message filename (:delete-index message))
+            )
+          (throw (Exception. (str "User " userId " isn't in chat " filename " while deleting"))))))))
 
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])
@@ -170,12 +177,15 @@
             ;; cache could be changed
             ;; we need to reload cache
             file-config (get-file-config filename)
-            persist-room-data (update-user-info filename userId viewed typing)]
-        (when persist-room-data
+            in-chat (get-in file-config [:room-data :users userId])]
+        (if in-chat
+          (let [persist-room-data (update-user-info filename userId viewed typing)]
+            (when persist-room-data
               (persist/write-room-data file-config persist-room-data))
-        (assoc
-         (get-in @topics [filename :room-data])
-         :messages (persist/read-stream file-config offset history))))))
+            (assoc
+             (get-in @topics [filename :room-data])
+             :messages (persist/read-stream file-config offset history)))
+          (throw (Exception. (str "User " userId " is not in chat " filename " while reading"))))))))
 
 (comment
   (get-in @topics ["test-room" :room-data])
