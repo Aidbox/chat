@@ -14,21 +14,28 @@
        (map io/delete-file)
        doall))
 
+(def auth-headers
+  {"Authorization" "Basic secret"})
+
 (defn sync-room [room & [metadata]]
   @(httpkit/post (str "http://localhost:8080/" room)
-                 {:body (json/generate-string {:action "syncRoom" :data (into {:users {:test-client {:viewed 0 :typing false}}} metadata)})}))
+                 {:headers auth-headers
+                  :body (json/generate-string {:action "syncRoom" :data (into {:users {:test-client {:viewed 0 :typing false}}} metadata)})}))
 
 (defn insert [room message]
   @(httpkit/post (str "http://localhost:8080/" room)
-                 {:body (json/generate-string {:action "createMessage" :data (assoc message :author {:id "test-client"})})}))
+                 {:headers auth-headers
+                  :body (json/generate-string {:action "createMessage" :data (assoc message :author {:id "test-client"})})}))
 
 (defn delete [room message-id]
   @(httpkit/post (str "http://localhost:8080/" room)
-                 {:body (json/generate-string {:action "deleteMessage" :data {:delete-index message-id :author {:id "test-client"}}})}))
+                 {:headers auth-headers
+                  :body (json/generate-string {:action "deleteMessage" :data {:delete-index message-id :author {:id "test-client"}}})}))
 
 (defn read [room & [params userId]]
   @(httpkit/post "http://localhost:8080/"
-                 {:body (json/generate-string
+                 {:headers auth-headers
+                  :body (json/generate-string
                          {:userId (or userId "test-client")
                           :chats [(into {:id room} params)]})}))
 (defn insert-n [n]

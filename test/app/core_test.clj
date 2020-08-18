@@ -25,10 +25,22 @@
         messages (doall (filter identity (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))))]
     messages))
 
+(deftest dump
+  (setup)
+  (testing "$dump returns zip output for authorized request"
+    (matcho/match @(httpkit/get "http://localhost:8080/$dump" {:headers utils/auth-headers})
+                  {:status 200 :headers {:content-type "application/zip"}}))
+
+  (testing "$dump returns 403 unauthorized request"
+    (matcho/match @(httpkit/get "http://localhost:8080/$dump" {:headers {"Authorization" "Basic wrongsecret"}})
+                  {:status 403}))
+  )
+
 (deftest send-and-read
   (setup)
   (testing "Options request"
-    (matcho/match @(httpkit/options "http://localhost:8080/fooo") {:status 200}))
+    (matcho/match @(httpkit/options "http://localhost:8080/fooo" {:headers utils/auth-headers})
+                  {:status 200}))
   (testing "Create message"
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})

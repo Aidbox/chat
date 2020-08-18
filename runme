@@ -22,6 +22,7 @@ sub_repl(){
 
 sub_tests(){
   echo "Running tests..."
+  export CHAT_SECRET="Basic secret"
   clj -A:test:runner $@
 }
 

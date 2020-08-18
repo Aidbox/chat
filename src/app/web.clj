@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [clojure.set :as clojure_set]
             [app.cache :as cache]
+            [app.dump :as dump]
             [org.httpkit.client :as httpkit-client]
             [org.httpkit.server :as httpkit]
             [cheshire.core :as json]
@@ -41,6 +42,12 @@
                    (catch Exception e
                      nil)))
                chats))))
+
+(defn dump-operation []
+  {:status 200
+   :headers {"Content-Type" "application/zip"}
+   :body (dump/dump)}
+  )
 
 (defonce auth (atom {}))
 
@@ -86,25 +93,33 @@
                   :chats chats})
           false)))))
 
-(defn is-authorized [req]
-  (let [authorization (get (:headers req) "authorization")]
-    (or
-     (= chat-secret authorization)
-     (check-auth authorization req))))
+
+(defn is-authorized [authorization req]
+  (or
+   (= chat-secret authorization)
+   (check-auth authorization req)))
 
 (defn app [req]
-  (let [{uri :uri action :request-method headers :headers} req]
+  (let [{uri :uri action :request-method headers :headers} req
+        authorization (get (:headers req) "authorization")]
     (if (= action :options)
       {:status 200
        :headers response-headers
        :body {}}
-      (if (and (= uri "/")
-               (= action :get))
+      (cond
+        (and (= uri "/") (= action :get))
         (index)
+
+        (and (= uri "/$dump") (= action :get))
+        (if (= chat-secret authorization)
+          (dump-operation)
+          (json-resp 403 {:error "unauthorized"
+                          :error_description "Unauthorized request"}))
+
+        :else
         (try
-          (let [req (assoc req :body (json/parse-string (slurp (:body req)) keyword))
-                authorization (get (:headers req) "authorization")]
-            (if (is-authorized req)
+          (let [req (assoc req :body (json/parse-string (slurp (:body req)) keyword))]
+            (if (is-authorized authorization req)
               (if (= action :post)
                 (case uri
                   "/" (batch-operation (:body req))
