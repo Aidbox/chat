@@ -17,13 +17,20 @@
 
 (defn get-config-lock [filename] (@topic-locks filename))
 
+(defn load-topic [filename]
+  (swap! topics #(assoc % filename (persist/load-config filename))))
+
 (defn get-file-config [filename]
   (let [file-config (@topics filename)]
     (if file-config
       file-config
       (do
         (swap! topic-locks #(assoc % filename (Object.)))
-        (get (swap! topics #(assoc % filename (persist/load-config filename))) filename)))))
+        (get (load-topic filename) filename)))))
+
+(defn remove-topic [filename]
+  (persist/close-topic (get-file-config filename))
+  (swap! topics #(dissoc % filename)))
 
 (defn- prepare-users [users]
   (into {} (map
@@ -158,7 +165,9 @@
         (do
           (raw-write-message filename userId message authorization)
             ;; TODO perform delete on the persistent layer
-          #_(persist/delete-message filename (:delete-index message)))
+          (remove-topic filename)
+          (persist/delete-message filename (:delete-index message))
+          (load-topic filename))
         (throw (Exception. (str "User " userId " isn't in chat " filename " while deleting")))))))
 
 (defn update-user-info [filename userId viewed typing]

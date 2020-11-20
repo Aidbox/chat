@@ -96,6 +96,11 @@
          :writer (io/writer file :append true)
          :reader (io/input-stream file)}))))
 
+(defn close-topic [{:keys [index-writer writer reader]}]
+  (.close index-writer)
+  (.close writer)
+  (.close reader))
+
 (defn update-room-info [filename room-data]
   (let [base-filename (str "./data/" filename)
         info-file (io/file (str base-filename ".info"))]
@@ -174,6 +179,8 @@
                                 )]
           (if (not correct)
             (println "Wrong indexing of " (.getName file))))))))
+
+(defn delete-message [filename index] ())
 
 (comment
   (check-index)
