@@ -6,18 +6,24 @@
 
 
 (defonce ^:private topics (atom {}))
+(defonce ^:private topic-locks (atom {}))
 
 (defn reset-cache! []
-  (reset! topics {}))
+  (reset! topics {})
+  (reset! topic-locks {}))
 
 (defn update-cache-index [filename data]
   (swap! topics assoc-in [filename :index-cache] data))
+
+(defn get-config-lock [filename] (@topic-locks filename))
 
 (defn get-file-config [filename]
   (let [file-config (@topics filename)]
     (if file-config
       file-config
-      (get (swap! topics #(assoc % filename (persist/load-config filename))) filename))))
+      (do
+        (swap! topic-locks #(assoc % filename (Object.)))
+        (get (swap! topics #(assoc % filename (persist/load-config filename))) filename)))))
 
 (defn- prepare-users [users]
   (into {} (map
@@ -30,30 +36,31 @@
                 filename
                 (assoc room-data
                        :users (prepare-users users)))]
+    (swap! topic-locks #(assoc % filename (Object.)))
     (swap! topics #(assoc % filename config))))
 
 (defn- update-room [filename {users :users :as room-data}]
-  (let [file (get (get-file-config filename) :file)]
-    (locking file
-      (let [;; if we was locked,
+  (get-file-config filename) ;; load file config if it miss
+  (locking (get-config-lock filename)
+    (let [;; if we was locked,
             ;; cache could be changed
             ;; we need to reload cache
-            file-config (get-file-config filename)
-            users (prepare-users users)
-            prev-users (get-in file-config [:room-data :users])
-            new-room-data (assoc
-                           room-data
-                           :users (reduce
-                                   (fn [acc [user-id user-info]]
-                                     (if (get acc user-id)
-                                       (assoc acc user-id user-info)
-                                       acc))
-                                   users
-                                   prev-users))
-            room-data (merge (:room-data file-config) new-room-data) ;; keep chat useruser information
-            ]
-        (persist/update-room-info filename room-data)
-        (swap! topics #(assoc-in % [filename :room-data] room-data))))))
+          file-config (get-file-config filename)
+          users (prepare-users users)
+          prev-users (get-in file-config [:room-data :users])
+          new-room-data (assoc
+                         room-data
+                         :users (reduce
+                                 (fn [acc [user-id user-info]]
+                                   (if (get acc user-id)
+                                     (assoc acc user-id user-info)
+                                     acc))
+                                 users
+                                 prev-users))
+          room-data (merge (:room-data file-config) new-room-data) ;; keep chat useruser information
+          ]
+      (persist/update-room-info filename room-data)
+      (swap! topics #(assoc-in % [filename :room-data] room-data)))))
 
 (defn sync-room [filename room-data]
   (if (persist/is-config-exists filename)
@@ -85,8 +92,7 @@
                              (when (> (time/in-msecs (time/interval last-active now)) 2000)
                                id))
                            (catch Exception e
-                             (println e)
-                             ))))]
+                             (println e)))))]
     (when (count offline-users)
       (send-notification chat-name offline-users message authorization))))
 
@@ -127,34 +133,33 @@
         (persist/write-room-data file-config persist-room-data)))))
 
 (defn write-message [filename message authorization]
-  (let [file (get (get-file-config filename) :file)]
-    (locking file
-      (let [;; if we was locked,
+  (get-file-config filename) ;; load file config if it miss
+  (locking (get-config-lock filename)
+    (let [;; if we was locked,
             ;; cache could be changed
             ;; we need to reload cache
-            file-config (get-file-config filename)
-            userId (keyword (get-in message [:author :id]))
-            in-chat (get-in file-config [:room-data :users userId])]
-        (if in-chat
-          (raw-write-message filename userId message authorization)
-          (throw (Exception. (str "User " userId " isn't in chat " filename " while writing"))))))))
+          file-config (get-file-config filename)
+          userId (keyword (get-in message [:author :id]))
+          in-chat (get-in file-config [:room-data :users userId])]
+      (if in-chat
+        (raw-write-message filename userId message authorization)
+        (throw (Exception. (str "User " userId " isn't in chat " filename " while writing")))))))
 
 (defn delete-message [filename message authorization]
-  (let [file (get (get-file-config filename) :file)]
-    (locking file
-      (let [;; if we was locked,
+  (get-file-config filename) ;; load file config if it miss
+  (locking (get-config-lock filename)
+    (let [;; if we was locked,
             ;; cache could be changed
             ;; we need to reload cache
-            file-config (get-file-config filename)
-            userId (keyword (get-in message [:author :id]))
-            in-chat (get-in file-config [:room-data :users userId])]
-        (if in-chat
-          (do
-            (raw-write-message filename userId message authorization)
+          file-config (get-file-config filename)
+          userId (keyword (get-in message [:author :id]))
+          in-chat (get-in file-config [:room-data :users userId])]
+      (if in-chat
+        (do
+          (raw-write-message filename userId message authorization)
             ;; TODO perform delete on the persistent layer
-            #_(delete-message filename (:delete-index message))
-            )
-          (throw (Exception. (str "User " userId " isn't in chat " filename " while deleting"))))))))
+          #_(persist/delete-message filename (:delete-index message)))
+        (throw (Exception. (str "User " userId " isn't in chat " filename " while deleting")))))))
 
 (defn update-user-info [filename userId viewed typing]
   (let [old-room-data (get-in @topics [filename :room-data])
@@ -171,27 +176,25 @@
       (assoc old-room-data :users new))))
 
 (defn read-messages [filename {:keys [userId offset history viewed typing]}]
-  (let [file-config (get-file-config filename)]
-    (locking (:file file-config)
-      (let [;; if we was locked,
+  (get-file-config filename) ;; load file config if it miss
+  (locking (get-config-lock filename)
+    (let [;; if we was locked,
             ;; cache could be changed
             ;; we need to reload cache
-            file-config (get-file-config filename)
-            in-chat (get-in file-config [:room-data :users userId])]
-        (if in-chat
-          (let [persist-room-data (update-user-info filename userId viewed typing)]
-            (when persist-room-data
-              (persist/write-room-data file-config persist-room-data))
-            (assoc
-             (get-in @topics [filename :room-data])
-             :messages (persist/read-stream file-config offset history)))
-          (throw (Exception. (str "User " userId " is not in chat " filename " while reading"))))))))
+          file-config (get-file-config filename)
+          in-chat (get-in file-config [:room-data :users userId])]
+      (if in-chat
+        (let [persist-room-data (update-user-info filename userId viewed typing)]
+          (when persist-room-data
+            (persist/write-room-data file-config persist-room-data))
+          (assoc
+           (get-in @topics [filename :room-data])
+           :messages (persist/read-stream file-config offset history)))
+        (throw (Exception. (str "User " userId " is not in chat " filename " while reading")))))))
 
 (comment
   (get-in @topics ["test-room" :room-data])
   (get-in @topics ["benchmark" :room-data])
 
-  (:id (:chat (:room-data @debug)))
-
-  )
+  (:id (:chat (:room-data @debug))))
 
