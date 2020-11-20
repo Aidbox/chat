@@ -164,7 +164,6 @@
       (if in-chat
         (do
           (raw-write-message filename userId message authorization)
-            ;; TODO perform delete on the persistent layer
           (remove-topic filename)
           (persist/delete-message filename (:delete-index message))
           (load-topic filename))

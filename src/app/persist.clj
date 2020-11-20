@@ -180,7 +180,25 @@
           (if (not correct)
             (println "Wrong indexing of " (.getName file))))))))
 
-(defn delete-message [filename index] ())
+(defn delete-message [filename index]
+  (let [file-path (str "./data/" filename ".data")
+        source-file (io/file file-path)
+        destination-file (java.io.File/createTempFile filename ".data")]
+    (with-open [source (io/reader source-file)
+                destination (io/writer destination-file)]
+      (doseq [[current-index line] (map-indexed vector (line-seq source))]
+        (if (= (+ current-index 1) index)
+          (let [message (json/parse-string line keyword)
+                text (:text message)
+                text-length (alength (.getBytes text))
+                replacing-text (apply str (repeatedly text-length (constantly \space)))
+                replacing-line (json/generate-string (assoc message :text replacing-text))]
+            (.write destination replacing-line))
+          (.write destination line))
+        (.write destination "\n")))
+    (io/copy destination-file source-file)
+    (.delete destination-file)
+    ))
 
 (comment
   (check-index)

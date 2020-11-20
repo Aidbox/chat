@@ -24,6 +24,15 @@
         messages (doall (filter identity (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))))]
     messages))
 
+(defn rand-str []
+  (apply str (repeatedly (+ (rand 12) 5) #(char (+ (rand 26) 65)))))
+
+(defn rand-emoji []
+  (if (= (int (rand 2)) 0) " 😬 😬" ""))
+
+(defn rand-text []
+  (str (rand-str) (rand-emoji)))
+
 (deftest dump
   (setup)
   (testing "$dump returns zip output for authorized request"
@@ -73,7 +82,7 @@
 
   (testing "Create many message"
     (doall (for [i (range 0 100)]
-             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+             (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
                  (matcho/match (utils/read test-room) {:status 200})))))
@@ -167,12 +176,11 @@
       (is (= status 200))
       (let [target (first (filter #(= (:message-index %) 101) lines))
             action (first (filter #(= (:message-index %) 106) lines))]
-        ;; TODO uncomment after delete will be implemented on the persistent layer
-        ;; (is (every? #(= % \space) (:text target)))
+        (is (every? #(= % \space) (:text target)))
         (is (not (nil? action))))))
   (testing "199 offset edge case"
     (doall (for [i (range 0 93)]
-             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+             (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
                  (matcho/match (utils/read test-room) {:status 200}))))
@@ -207,7 +215,7 @@
     (doall 
     (pmap
      (fn [_i] (doall (for [_i (range 0 100)]
-                 (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+                 (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
                      (matcho/match (utils/read test-room) {:status 200})))))
