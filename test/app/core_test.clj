@@ -7,7 +7,8 @@
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [app.core :as app]))
+            [app.core :as app]
+            [app.cache :as cache]))
 
 (def test-room "test-room")
 
@@ -32,6 +33,9 @@
 
 (defn rand-text []
   (str (rand-str) (rand-emoji)))
+
+(defn spaces? [text]
+  (every? #(= % \space) text))
 
 (deftest dump
   (setup)
@@ -176,7 +180,7 @@
       (is (= status 200))
       (let [target (first (filter #(= (:message-index %) 101) lines))
             action (first (filter #(= (:message-index %) 106) lines))]
-        (is (every? #(= % \space) (:text target)))
+        (is (spaces? (:text target)))
         (is (not (nil? action))))))
   (testing "199 offset edge case"
     (doall (for [i (range 0 93)]
@@ -209,20 +213,74 @@
       (is (= status 200))
       (is (= (count lines) 16)))))
 
-(deftest concurent-send-and-read
+(deftest concurent-send
   (setup)
   (testing "concurent send"
-    (doall 
-    (pmap
-     (fn [_i] (doall (for [_i (range 0 100)]
-                 (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
+    (doall
+     (pmap
+      (fn [_i] (doall (for [_i (range 0 100)]
+                        (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
-                     (matcho/match (utils/read test-room) {:status 200})))))
-     (range 0 100)))
+                            (matcho/match (utils/read test-room) {:status 200})))))
+      (range 0 100)))
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)
           last-line (first lines)]
 
       (is (= status 200))
       (is (= (:message-index last-line) 10000)))))
+
+(deftest anonimyze-author
+  (setup)
+  (testing "anonimyze author fields except id"
+    (matcho/match (utils/insert
+                            test-room
+                            {:text (rand-text)}
+                            {:name "Test Author"
+                             :active true
+                             :age 37
+                             :designation "practitioner"})
+      {:status 200})
+    (matcho/match (utils/author-anonymize) {:status 200})
+    (let [{:keys [status body]} (utils/read test-room)
+          lines (parse-messages body)
+          last-line (last lines)
+          author (:author last-line)]
+      (is (= status 200))
+      (matcho/match author {:id "test-client"
+                            :active true
+                            :age 37
+                            :name spaces?
+                            :designation spaces?}))))
+
+(deftest utils
+  (testing "find chats by user id"
+    (def data {"test-room-1"
+               {:room-data
+                {:users
+                 {:test-client
+                  {:viewed 1
+                   :typing false
+                   :last-active "2020-11-23T08:51:30.585Z"}}}
+                :index-cache
+                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+               "test-room-2"
+               {:room-data
+                {:users
+                 {:another-user
+                  {:viewed 1
+                   :typing false
+                   :last-active "2020-11-23T08:51:30.585Z"}}}
+                :index-cache
+                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+               "test-room-3"
+               {:room-data
+                {:users
+                 {:test-client
+                  {:viewed 1
+                   :typing false
+                   :last-active "2020-11-23T08:51:30.585Z"}}}
+                :index-cache
+                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}})
+    (is (= (cache/find-chats-by-user data :test-client) '("test-room-1" "test-room-3")))))

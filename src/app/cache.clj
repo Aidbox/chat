@@ -200,9 +200,22 @@
            :messages (persist/read-stream file-config offset history)))
         (throw (Exception. (str "User " userId " is not in chat " filename " while reading")))))))
 
-(comment
-  (get-in @topics ["test-room" :room-data])
-  (get-in @topics ["benchmark" :room-data])
+(defn find-chats-by-user [topics user-id]
+  (map
+   first
+   (filter (fn [[topic-id data]]
+             ((set (keys (get-in data [:room-data :users]))) user-id))
+           topics)))
 
-  (:id (:chat (:room-data @debug))))
+(defn anonymize-message-author [author-id]
+  (let [filenames (find-chats-by-user @topics author-id)]
+    (doseq [filename filenames]
+      (locking (get-config-lock filename)
+        (remove-topic filename)
+        (persist/anonymize-messages filename author-id)
+        (load-topic filename)))))
+
+(comment
+  (find-chats-by-user @topics :test-client)
+  (anonymize-message-author :test-client))
 

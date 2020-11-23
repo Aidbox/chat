@@ -22,10 +22,10 @@
                  {:headers auth-headers
                   :body (json/generate-string {:action "syncRoom" :data (into {:users {:test-client {:viewed 0 :typing false}}} metadata)})}))
 
-(defn insert [room message]
+(defn insert [room message & [author-extra]]
   @(httpkit/post (str "http://localhost:8080/" room)
                  {:headers auth-headers
-                  :body (json/generate-string {:action "createMessage" :data (assoc message :author {:id "test-client"})})}))
+                  :body (json/generate-string {:action "createMessage" :data (assoc message :author (merge {:id "test-client"} author-extra))})}))
 
 (defn delete [room message-id]
   @(httpkit/post (str "http://localhost:8080/" room)
@@ -58,14 +58,19 @@
      (read benchmark-room-name {:history history})))
   nil)
 
+(defn author-anonymize []
+  @(httpkit/post (str "http://localhost:8080/anonymizeAuthor")
+                 {:headers auth-headers
+                  :body (json/generate-string {:author-id "test-client"})}))
+
 (comment
   (do
     (println "STARTING ==================")
     (do
-        (clear-data)
-        (app/restart)
-        (create-room benchmark-room-name)
-        nil)
+      (clear-data)
+      (app/restart)
+      (create-room benchmark-room-name)
+      nil)
     (do (println "WRITE ==================")
         (time (insert-n 10000))
         (time (insert-n 10000))
@@ -122,7 +127,4 @@
         (time (history-n 10000 99800))
         (time (history-n 10000 99800))
         (time (history-n 10000 99800)))
-    (println "DONE ==================")
-    )
-
-  )
+    (println "DONE ==================")))
