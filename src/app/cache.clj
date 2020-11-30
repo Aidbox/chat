@@ -213,7 +213,8 @@
       (locking (get-config-lock filename)
         (remove-topic filename)
         (persist/anonymize-messages filename author-id)
-        (load-topic filename)))))
+        (load-topic filename)))
+    filenames))
 
 (comment
   (find-chats-by-user @topics :test-client)

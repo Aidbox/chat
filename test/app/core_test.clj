@@ -235,14 +235,14 @@
   (setup)
   (testing "anonimyze author fields except id"
     (matcho/match (utils/insert
-                            test-room
-                            {:text (rand-text)}
-                            {:name "Test Author"
-                             :active true
-                             :age 37
-                             :designation "practitioner"})
+                   test-room
+                   {:text (rand-text)}
+                   {:name "Test Author"
+                    :active true
+                    :age 37
+                    :designation "practitioner"})
       {:status 200})
-    (matcho/match (utils/author-anonymize) {:status 200})
+    (matcho/match (utils/author-anonymize) {:status 200 :body "{\"chat-ids\":[\"test-room\"]}"})
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)
           last-line (last lines)

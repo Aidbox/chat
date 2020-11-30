@@ -123,8 +123,12 @@
                 (case uri
                   ; TODO: check that only superadmin can anonymize author
                   "/anonymizeAuthor" (do
-                                       (cache/anonymize-message-author (keyword (get-in req [:body :author-id])))
-                                       (json-resp 200 {}))
+                                       (let [chat-ids
+                                             (cache/anonymize-message-author
+                                              (keyword (get-in
+                                                        req
+                                                        [:body :author-id])))]
+                                         (json-resp 200 {:chat-ids chat-ids})))
                   "/" (batch-operation (:body req))
                   (let [{:keys [action data]} (:body req)
                         [_ filename] (str/split uri #"/")]
