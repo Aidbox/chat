@@ -220,6 +220,14 @@
     (io/copy destination-file source-file)
     (.delete destination-file)))
 
+(defn delete-room-files [filename]
+  (let [data-file (io/file (str "./data/" filename ".data"))
+        info-file (io/file (str "./data/" filename ".info"))
+        index-file (io/file (str "./data/" filename ".index"))]
+    (.delete data-file)
+    (.delete info-file)
+    (.delete index-file)))
+
 (comment
   (def author-data {:id "test-id-123"
                     :name "Test Author"

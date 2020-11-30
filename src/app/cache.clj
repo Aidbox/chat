@@ -216,6 +216,11 @@
         (load-topic filename)))
     filenames))
 
+(defn delete-topic [filename]
+  (locking (get-config-lock filename)
+    (persist/delete-room-files filename)
+    ))
+
 (comment
   (find-chats-by-user @topics :test-client)
   (anonymize-message-author :test-client))

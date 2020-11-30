@@ -63,6 +63,11 @@
                  {:headers auth-headers
                   :body (json/generate-string {:author-id "test-client"})}))
 
+(defn delete-room [room & [metadata]]
+  @(httpkit/post (str "http://localhost:8080/" room)
+                 {:headers auth-headers
+                  :body (json/generate-string {:action "deleteRoom" :data (into metadata)})}))
+
 (comment
   (do
     (println "STARTING ==================")

@@ -284,3 +284,17 @@
                 :index-cache
                 {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}})
     (is (= (cache/find-chats-by-user data :test-client) '("test-room-1" "test-room-3")))))
+
+(deftest delete-room
+  (setup)
+  (testing "Delete all room files"
+    (matcho/match (utils/insert
+                   test-room
+                   {:text (rand-text)}
+                   {:name "Test Author"
+                    :active true
+                    :age 37
+                    :designation "practitioner"})
+      {:status 200})
+    (matcho/match (utils/delete-room) {:status 200})
+    ))
