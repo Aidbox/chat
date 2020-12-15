@@ -22,6 +22,11 @@
                  {:headers auth-headers
                   :body (json/generate-string {:action "syncRoom" :data (into {:users {:test-client {:viewed 0 :typing false}}} metadata)})}))
 
+(defn delete-room [room & [metadata]]
+  @(httpkit/post (str "http://localhost:8080/" room)
+                 {:headers auth-headers
+                  :body (json/generate-string {:action "deleteRoom" :data (into metadata)})}))
+
 (defn insert [room message & [author-extra]]
   @(httpkit/post (str "http://localhost:8080/" room)
                  {:headers auth-headers

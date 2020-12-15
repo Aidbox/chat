@@ -200,15 +200,12 @@
            :messages (persist/read-stream file-config offset history)))
         (throw (Exception. (str "User " userId " is not in chat " filename " while reading")))))))
 
-(defn find-chats-by-user [topics user-id]
-  (map
-   first
-   (filter (fn [[topic-id data]]
-             ((set (keys (get-in data [:room-data :users]))) user-id))
-           topics)))
+(defn find-all-chats-file-names []
+  (let [data-files (map #(:file %) (vals @topics))]
+    (map (fn [f] (first (persist/get-splitted-file-name f))) data-files)))
 
 (defn anonymize-message-author [author-id]
-  (let [filenames (persist/find-all-chats-file-names)]
+  (let [filenames (find-all-chats-file-names)]
     (doseq [filename filenames]
       (locking (get-config-lock filename)
         (remove-topic filename)
@@ -218,9 +215,11 @@
 
 (defn delete-topic [filename]
   (locking (get-config-lock filename)
-    (persist/delete-room-files filename)))
+    (persist/delete-room-files filename)
+    (remove-topic filename))
+  (swap! topic-locks #(dissoc % filename)))
 
 (comment
-  (find-chats-by-user @topics :test-client)
-  (anonymize-message-author :test-client))
+  (anonymize-message-author :test-client)
+  (println @topics))
 

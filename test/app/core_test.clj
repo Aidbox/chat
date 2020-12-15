@@ -256,35 +256,6 @@
                             :designation spaces?}))))
 
 (deftest utils
-  (testing "find chats by user id"
-    (def data {"test-room-1"
-               {:room-data
-                {:users
-                 {:test-client
-                  {:viewed 1
-                   :typing false
-                   :last-active "2020-11-23T08:51:30.585Z"}}}
-                :index-cache
-                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
-               "test-room-2"
-               {:room-data
-                {:users
-                 {:another-user
-                  {:viewed 1
-                   :typing false
-                   :last-active "2020-11-23T08:51:30.585Z"}}}
-                :index-cache
-                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
-               "test-room-3"
-               {:room-data
-                {:users
-                 {:test-client
-                  {:viewed 1
-                   :typing false
-                   :last-active "2020-11-23T08:51:30.585Z"}}}
-                :index-cache
-                {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}})
-    (is (= (cache/find-chats-by-user data :test-client) '("test-room-1" "test-room-3"))))
   (testing "get-splitted-file-name"
     (setup)
     (let [file (io/file (str "./data/" test-room ".data"))]
@@ -292,7 +263,7 @@
   (testing "find-all-chats-file-names"
     (setup)
     (utils/sync-room "test-room-2")
-    (is (= (persist/find-all-chats-file-names) ["test-room", "test-room-2"]))))
+    (is (= (cache/find-all-chats-file-names) (list "test-room", "test-room-2")))))
 
 (deftest delete-room
   (setup)
@@ -329,4 +300,36 @@
         (is (not (.exists test-1-index-file)))
         (is (.exists test-2-info-file))
         (is (.exists test-2-data-file))
-        (is (.exists test-2-index-file))))))
+        (is (.exists test-2-index-file)))
+      (matcho/match (utils/delete-room test-room) {:status 500}))))
+
+(comment
+  (def data {"test-room-1"
+             {:room-data
+              {:users
+               {:test-client
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+             "test-room-2"
+             {:room-data
+              {:users
+               {:another-user
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+             "test-room-3"
+             {:room-data
+              {:users
+               {:test-client
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}}
+    )
+(mapv #(:room-data %) (vals data)))

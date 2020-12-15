@@ -234,14 +234,6 @@
       (clojure.string/split file-name #"\."))
     []))
 
-(defn find-all-chats-file-names []
-  (let [folder (io/file "./data")]
-    (->> folder
-         (.listFiles)
-         (filterv (fn [f] (let [file-ext (last (get-splitted-file-name f))]
-                            (= file-ext "data"))))
-         (mapv #(first (get-splitted-file-name %))))))
-
 (comment
   (def author-data {:id "test-id-123"
                     :name "Test Author"
