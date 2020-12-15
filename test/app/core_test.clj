@@ -296,5 +296,28 @@
                     :age 37
                     :designation "practitioner"})
       {:status 200})
-    (matcho/match (utils/delete-room) {:status 200})
-    ))
+    (let [test-room-2 "test-room-2"]
+      (utils/sync-room test-room-2)
+      (matcho/match (utils/insert
+                     test-room-2
+                     {:text (rand-text)}
+                     {:name "Test Author"
+                      :active true
+                      :age 37
+                      :designation "practitioner"})
+        {:status 200})
+      (matcho/match (utils/delete-room test-room) {:status 200})
+      (let [test-1-base-filename (str "./data/" test-room)
+            test-2-base-filename (str "./data/" test-room-2)
+            test-1-info-file (io/file (str test-1-base-filename ".info"))
+            test-1-data-file (io/file (str test-1-base-filename ".data"))
+            test-1-index-file (io/file (str test-1-base-filename ".index"))
+            test-2-info-file (io/file (str test-2-base-filename ".info"))
+            test-2-data-file (io/file (str test-2-base-filename ".data"))
+            test-2-index-file (io/file (str test-2-base-filename ".index"))]
+        (is (not (.exists test-1-info-file)))
+        (is (not (.exists test-1-data-file)))
+        (is (not (.exists test-1-index-file)))
+        (is (.exists test-2-info-file))
+        (is (.exists test-2-data-file))
+        (is (.exists test-2-index-file))))))
