@@ -228,6 +228,20 @@
     (.delete info-file)
     (.delete index-file)))
 
+(defn get-splitted-file-name [file]
+  (if (.isFile file)
+    (let [file-name (.getName file)]
+      (clojure.string/split file-name #"\."))
+    []))
+
+(defn find-all-chats-file-names []
+  (let [folder (io/file "./data")]
+    (->> folder
+         (.listFiles)
+         (filterv (fn [f] (let [file-ext (last (get-splitted-file-name f))]
+                            (= file-ext "data"))))
+         (mapv #(first (get-splitted-file-name %))))))
+
 (comment
   (def author-data {:id "test-id-123"
                     :name "Test Author"
@@ -263,4 +277,13 @@
                                            (map (fn [[k v]]
                                                   [k (update v :last-active format-time/parse)]) x)))))
 
-  (format-time/parse (get (json/parse-string (json/generate-string {:now (time/now)})) "now")))
+  (format-time/parse (get (json/parse-string (json/generate-string {:now (time/now)})) "now"))
+  (let [folder (io/file "./data")]
+    (mapv #(first (get-splitted-file-name %)) (filterv (fn [f] (let [file-ext (last (get-splitted-file-name f))]
+                                                                 (= file-ext "data"))) (.listFiles folder))))
+  (let [folder (io/file "./data")]
+    (->> folder
+         (.listFiles)
+         (filterv (fn [f] (let [file-ext (last (get-splitted-file-name f))]
+                            (= file-ext "data"))))
+         (mapv #(first (get-splitted-file-name %))))))

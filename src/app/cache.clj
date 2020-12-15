@@ -208,7 +208,7 @@
            topics)))
 
 (defn anonymize-message-author [author-id]
-  (let [filenames (find-chats-by-user @topics author-id)]
+  (let [filenames (persist/find-all-chats-file-names)]
     (doseq [filename filenames]
       (locking (get-config-lock filename)
         (remove-topic filename)
@@ -218,8 +218,7 @@
 
 (defn delete-topic [filename]
   (locking (get-config-lock filename)
-    (persist/delete-room-files filename)
-    ))
+    (persist/delete-room-files filename)))
 
 (comment
   (find-chats-by-user @topics :test-client)

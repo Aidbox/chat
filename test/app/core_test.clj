@@ -8,6 +8,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [app.core :as app]
+            [app.persist :as persist]
             [app.cache :as cache]))
 
 (def test-room "test-room")
@@ -283,7 +284,15 @@
                    :last-active "2020-11-23T08:51:30.585Z"}}}
                 :index-cache
                 {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}})
-    (is (= (cache/find-chats-by-user data :test-client) '("test-room-1" "test-room-3")))))
+    (is (= (cache/find-chats-by-user data :test-client) '("test-room-1" "test-room-3"))))
+  (testing "get-splitted-file-name"
+    (setup)
+    (let [file (io/file (str "./data/" test-room ".data"))]
+      (is (= (persist/get-splitted-file-name file) [test-room "data"]))))
+  (testing "find-all-chats-file-names"
+    (setup)
+    (utils/sync-room "test-room-2")
+    (is (= (persist/find-all-chats-file-names) ["test-room", "test-room-2"]))))
 
 (deftest delete-room
   (setup)
