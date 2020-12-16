@@ -143,8 +143,13 @@
                                    (cache/sync-room filename data)
                                    (json-resp 200 {}))
                       "deleteRoom" (do
-                                     (cache/delete-topic filename )
-                                     (json-resp 200 {}))
+                                     (try
+                                       (cache/delete-topic filename)
+                                       (json-resp 200 {})
+                                       (catch java.io.FileNotFoundException e
+                                         (json-resp 404 {:error "Not found"
+                                                         :error_description (.getMessage e)})))
+                                     )
                       (json-resp 422 {:error "wrong_action"
                                       :error_description "Unsupported action"}))))
                 (json-resp 422 {:error "wrong_method"

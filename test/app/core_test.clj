@@ -301,7 +301,7 @@
         (is (.exists test-2-info-file))
         (is (.exists test-2-data-file))
         (is (.exists test-2-index-file)))
-      (matcho/match (utils/delete-room test-room) {:status 500}))))
+      (matcho/match (utils/delete-room test-room) {:status 404}))))
 
 (comment
   (def data {"test-room-1"

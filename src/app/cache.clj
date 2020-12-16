@@ -15,7 +15,8 @@
 (defn update-cache-index [filename data]
   (swap! topics assoc-in [filename :index-cache] data))
 
-(defn get-config-lock [filename] (@topic-locks filename))
+(defn get-config-lock [filename]
+  (@topic-locks filename))
 
 (defn load-topic [filename]
   (swap! topics #(assoc % filename (persist/load-config filename))))
@@ -214,6 +215,10 @@
     filenames))
 
 (defn delete-topic [filename]
+  (when (nil? (get @topics filename))
+    (throw
+     (java.io.FileNotFoundException.
+      (str "Chat " filename "was not found"))))
   (locking (get-config-lock filename)
     (persist/delete-room-files filename)
     (remove-topic filename))
