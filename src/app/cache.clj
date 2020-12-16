@@ -202,8 +202,7 @@
         (throw (Exception. (str "User " userId " is not in chat " filename " while reading")))))))
 
 (defn find-all-chats-file-names []
-  (let [data-files (map #(:file %) (vals @topics))]
-    (map (fn [f] (first (persist/get-splitted-file-name f))) data-files)))
+  (keys @topics))
 
 (defn anonymize-message-author [author-id]
   (let [filenames (find-all-chats-file-names)]
