@@ -7,15 +7,16 @@
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [app.core :as app]))
+            [app.core :as app]
+            [app.persist :as persist]
+            [app.cache :as cache]))
 
 (def test-room "test-room")
 
-(defn setup[]
+(defn setup []
   (utils/clear-data)
   (sut/restart)
-  (utils/sync-room test-room)
-  )
+  (utils/sync-room test-room))
 
 (defn parse-chat [body]
   (first (json/parse-string body keyword)))
@@ -25,22 +26,33 @@
         messages (doall (filter identity (map #(json/parse-string % keyword) (str/split (:messages chat) #"\n"))))]
     messages))
 
+(defn rand-str []
+  (apply str (repeatedly (+ (rand 12) 5) #(char (+ (rand 26) 65)))))
+
+(defn rand-emoji []
+  (if (= (int (rand 2)) 0) " 😬 😬" ""))
+
+(defn rand-text []
+  (str (rand-str) (rand-emoji)))
+
+(defn spaces? [text]
+  (every? #(= % \space) text))
+
 (deftest dump
   (setup)
   (testing "$dump returns zip output for authorized request"
     (matcho/match @(httpkit/get "http://localhost:8080/$dump" {:headers utils/auth-headers})
-                  {:status 200 :headers {:content-type "application/zip"}}))
+      {:status 200 :headers {:content-type "application/zip"}}))
 
   (testing "$dump returns 403 unauthorized request"
     (matcho/match @(httpkit/get "http://localhost:8080/$dump" {:headers {"Authorization" "Basic wrongsecret"}})
-                  {:status 403}))
-  )
+      {:status 403})))
 
 (deftest send-and-read
   (setup)
   (testing "Options request"
     (matcho/match @(httpkit/options "http://localhost:8080/fooo" {:headers utils/auth-headers})
-                  {:status 200}))
+      {:status 200}))
   (testing "Create message"
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
     (matcho/match (utils/insert test-room {:text "hello"}) {:status 200})
@@ -60,10 +72,10 @@
       (is (= status 200))
       (is (= (count lines) 5))
       (matcho/match lines [{:message-index 1}
-                            {:message-index 2}
-                            {:message-index 3}
-                            {:message-index 4}
-                            {:message-index 5}])))
+                           {:message-index 2}
+                           {:message-index 3}
+                           {:message-index 4}
+                           {:message-index 5}])))
 
   (testing "Read offset"
     (let [{:keys [status body]} (utils/read test-room {:offset 3})
@@ -71,11 +83,11 @@
       (is (= status 200))
       (is (= (count lines) 2))
       (matcho/match lines [{:message-index 4}
-                            {:message-index 5}])))
+                           {:message-index 5}])))
 
   (testing "Create many message"
     (doall (for [i (range 0 100)]
-             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+             (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
                  (matcho/match (utils/read test-room) {:status 200})))))
@@ -87,11 +99,11 @@
       (is (= status 200))
       (is (= (count lines) 6))
       (matcho/match lines [{:message-index 100}
-                            {:message-index 101}
-                            {:message-index 102}
-                            {:message-index 103}
-                            {:message-index 104}
-                            {:message-index 105}])))
+                           {:message-index 101}
+                           {:message-index 102}
+                           {:message-index 103}
+                           {:message-index 104}
+                           {:message-index 105}])))
 
   (testing "Read offset"
     (let [{:keys [status body]} (utils/read test-room {:offset 98})
@@ -104,17 +116,17 @@
       (is (= status 200))
       (is (= (count lines) 6))
       (matcho/match lines [{:message-index 100}
-                            {:message-index 101}
-                            {:message-index 102}
-                            {:message-index 103}
-                            {:message-index 104}
-                            {:message-index 105}]))
+                           {:message-index 101}
+                           {:message-index 102}
+                           {:message-index 103}
+                           {:message-index 104}
+                           {:message-index 105}]))
     (let [{:keys [status body]} (utils/read test-room {:offset 103})
           lines (parse-messages body)]
       (is (= status 200))
       (is (= (count lines) 2))
       (matcho/match lines [{:message-index 104}
-                            {:message-index 105}])))
+                           {:message-index 105}])))
 
   (testing "History"
     (let [{:keys [status body]} (utils/read test-room {:history 100})
@@ -149,7 +161,7 @@
         (matcho/match chat  {:meta "foo" :bar "baz" :users {:test-client {:viewed 2}}}))
 
       (utils/sync-room room-name {:empty :data :users {:superadmin {:viewed 0}
-                                                                    :test-client {:viewed 0}}})
+                                                       :test-client {:viewed 0}}})
       (let [{:keys [status body]} (utils/read room-name {})
             chat (first (json/parse-string body keyword))]
         (is (= status 200))
@@ -169,13 +181,11 @@
       (is (= status 200))
       (let [target (first (filter #(= (:message-index %) 101) lines))
             action (first (filter #(= (:message-index %) 106) lines))]
-        ;; TODO uncomment after delete will be implemented on the persistent layer
-        ;; (is (nil? target))
-        (is (not (nil? action)))
-        )))
+        (is (spaces? (:text target)))
+        (is (not (nil? action))))))
   (testing "199 offset edge case"
     (doall (for [i (range 0 93)]
-             (do (matcho/match (utils/insert test-room {:text "hello 12345678"}) {:status 200})
+             (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
                  ;; We have to warm up buffer to fix init issues
                  ;; if we remove read here test will fail
                  (matcho/match (utils/read test-room) {:status 200}))))
@@ -198,8 +208,128 @@
     (doall (for [_ (range 0 100)]
           ;; We have to warm up buffer to fix init issues
           ;; if we remove read here test will fail
-          (utils/read test-room)))
+             (utils/read test-room)))
     (let [{:keys [status body]} (utils/read test-room)
           lines (parse-messages body)]
       (is (= status 200))
       (is (= (count lines) 16)))))
+
+(deftest concurent-send
+  (setup)
+  (testing "concurent send"
+    (doall
+     (pmap
+      (fn [_i] (doall (for [_i (range 0 100)]
+                        (do (matcho/match (utils/insert test-room {:text (rand-text)}) {:status 200})
+                 ;; We have to warm up buffer to fix init issues
+                 ;; if we remove read here test will fail
+                            (matcho/match (utils/read test-room) {:status 200})))))
+      (range 0 100)))
+    (let [{:keys [status body]} (utils/read test-room)
+          lines (parse-messages body)
+          last-line (first lines)]
+
+      (is (= status 200))
+      (is (= (:message-index last-line) 10000)))))
+
+(deftest anonimyze-author
+  (setup)
+  (testing "anonimyze author fields except id"
+    (matcho/match (utils/insert
+                   test-room
+                   {:text (rand-text)}
+                   {:name "Test Author"
+                    :active true
+                    :age 37
+                    :designation "practitioner"})
+      {:status 200})
+    (matcho/match (utils/author-anonymize) {:status 200 :body "{\"chat-ids\":[\"test-room\"]}"})
+    (let [{:keys [status body]} (utils/read test-room)
+          lines (parse-messages body)
+          last-line (last lines)
+          author (:author last-line)]
+      (is (= status 200))
+      (matcho/match author {:id "test-client"
+                            :active true
+                            :age 37
+                            :name spaces?
+                            :designation spaces?}))))
+
+(deftest utils
+  (testing "get-splitted-file-name"
+    (setup)
+    (let [file (io/file (str "./data/" test-room ".data"))]
+      (is (= (persist/get-splitted-file-name file) [test-room "data"]))))
+  (testing "find-all-chats-file-names"
+    (setup)
+    (utils/sync-room "test-room-2")
+    (is (= (cache/find-all-chats-file-names) (list "test-room", "test-room-2")))))
+
+(deftest delete-room
+  (setup)
+  (testing "Delete all room files"
+    (matcho/match (utils/insert
+                   test-room
+                   {:text (rand-text)}
+                   {:name "Test Author"
+                    :active true
+                    :age 37
+                    :designation "practitioner"})
+      {:status 200})
+    (let [test-room-2 "test-room-2"]
+      (utils/sync-room test-room-2)
+      (matcho/match (utils/insert
+                     test-room-2
+                     {:text (rand-text)}
+                     {:name "Test Author"
+                      :active true
+                      :age 37
+                      :designation "practitioner"})
+        {:status 200})
+      (matcho/match (utils/delete-room test-room) {:status 200})
+      (let [test-1-base-filename (str "./data/" test-room)
+            test-2-base-filename (str "./data/" test-room-2)
+            test-1-info-file (io/file (str test-1-base-filename ".info"))
+            test-1-data-file (io/file (str test-1-base-filename ".data"))
+            test-1-index-file (io/file (str test-1-base-filename ".index"))
+            test-2-info-file (io/file (str test-2-base-filename ".info"))
+            test-2-data-file (io/file (str test-2-base-filename ".data"))
+            test-2-index-file (io/file (str test-2-base-filename ".index"))]
+        (is (not (.exists test-1-info-file)))
+        (is (not (.exists test-1-data-file)))
+        (is (not (.exists test-1-index-file)))
+        (is (.exists test-2-info-file))
+        (is (.exists test-2-data-file))
+        (is (.exists test-2-index-file)))
+      (matcho/match (utils/delete-room test-room) {:status 404}))))
+
+(comment
+  (def data {"test-room-1"
+             {:room-data
+              {:users
+               {:test-client
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+             "test-room-2"
+             {:room-data
+              {:users
+               {:another-user
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}
+             "test-room-3"
+             {:room-data
+              {:users
+               {:test-client
+                {:viewed 1
+                 :typing false
+                 :last-active "2020-11-23T08:51:30.585Z"}}}
+              :index-cache
+              {:lines-count 1, :length 181, :last-index 0, :line-index {0 0}}}}
+    )
+(mapv #(:room-data %) (vals data)))

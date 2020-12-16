@@ -33,21 +33,20 @@
 
 (defn batch-operation [{:keys [userId chats]}]
   (json-resp 200
-        (remove nil?
-          (map (fn [{id :id :as meta}]
-                 (try
-                   (assoc
-                    (cache/read-messages id (assoc meta :userId (keyword userId)))
-                    :id id)
-                   (catch Exception e
-                     nil)))
-               chats))))
+             (remove nil?
+                     (map (fn [{id :id :as meta}]
+                            (try
+                              (assoc
+                               (cache/read-messages id (assoc meta :userId (keyword userId)))
+                               :id id)
+                              (catch Exception e
+                                nil)))
+                          chats))))
 
 (defn dump-operation []
   {:status 200
    :headers {"Content-Type" "application/zip"}
-   :body (dump/dump)}
-  )
+   :body (dump/dump)})
 
 (defonce auth (atom {}))
 
@@ -61,9 +60,9 @@
       "/" (if (= action :post)
             (let [data (:body req)]
               (set (map :id (:chats data))))
-              (set []))
+            (set []))
       (let [{:keys [action data]} (:body req)
-            [_ filename](str/split uri #"/")]
+            [_ filename] (str/split uri #"/")]
         (case action
           "createMessage" (set [filename])
           "deleteMessage" (set [filename])
@@ -122,9 +121,17 @@
             (if (is-authorized authorization req)
               (if (= action :post)
                 (case uri
+                  ; TODO: check that only superadmin can anonymize author
+                  "/anonymizeAuthor" (do
+                                       (let [chat-ids
+                                             (cache/anonymize-message-author
+                                              (keyword (get-in
+                                                        req
+                                                        [:body :author-id])))]
+                                         (json-resp 200 {:chat-ids chat-ids})))
                   "/" (batch-operation (:body req))
                   (let [{:keys [action data]} (:body req)
-                        [_ filename](str/split uri #"/")]
+                        [_ filename] (str/split uri #"/")]
                     (case action
                       "deleteMessage" (do
                                         (cache/delete-message filename data authorization)
@@ -133,8 +140,16 @@
                                         (cache/write-message filename data authorization)
                                         (json-resp 200 {}))
                       "syncRoom" (do
-                                     (cache/sync-room filename data)
-                                     (json-resp 200 {}))
+                                   (cache/sync-room filename data)
+                                   (json-resp 200 {}))
+                      "deleteRoom" (do
+                                     (try
+                                       (cache/delete-topic filename)
+                                       (json-resp 200 {})
+                                       (catch java.io.FileNotFoundException e
+                                         (json-resp 404 {:error "Not found"
+                                                         :error_description (.getMessage e)})))
+                                     )
                       (json-resp 422 {:error "wrong_action"
                                       :error_description "Unsupported action"}))))
                 (json-resp 422 {:error "wrong_method"
@@ -161,8 +176,7 @@
            {:id "room-15"
             :offset 15
             :viewed 15
-            :typing true}
-           ]}
+            :typing true}]}
   BATCH Response
   [{:id "room-1"
     :messages [...]
@@ -185,5 +199,4 @@
              :online true}
             {:userid "test"
              :typing false
-             :online false}]}]
-  )
+             :online false}]}])
